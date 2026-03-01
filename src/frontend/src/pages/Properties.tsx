@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -31,7 +32,12 @@ import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
 import type { AppRole } from "../components/RoleSelection";
-import type { Society, Tower, Unit } from "../store/societyStore";
+import type {
+  MaintenanceBreakdown,
+  Society,
+  Tower,
+  Unit,
+} from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
 // ─── Add Tower Dialog ─────────────────────────────────────────────────────────
@@ -234,6 +240,208 @@ function EditTowerDialog({
   );
 }
 
+// ─── Maintenance Breakdown Fields ────────────────────────────────────────────
+
+function MaintenanceBreakdownFields({
+  serviceCharges,
+  setServiceCharges,
+  nonOccupancyCharges,
+  setWaterCharges,
+  liftMaintenance,
+  setLiftMaintenance,
+  parkingCharges,
+  setParkingCharges,
+  sinkingFund,
+  setSinkingFund,
+  otherCharges,
+  setOtherCharges,
+  houseTax,
+  setHouseTax,
+  repairMaintenance,
+  setRepairMaintenance,
+  interest,
+  setInterest,
+  previousDue,
+  setPreviousDue,
+}: {
+  serviceCharges: string;
+  setServiceCharges: (v: string) => void;
+  nonOccupancyCharges: string;
+  setWaterCharges: (v: string) => void;
+  liftMaintenance: string;
+  setLiftMaintenance: (v: string) => void;
+  parkingCharges: string;
+  setParkingCharges: (v: string) => void;
+  sinkingFund: string;
+  setSinkingFund: (v: string) => void;
+  otherCharges: string;
+  setOtherCharges: (v: string) => void;
+  houseTax: string;
+  setHouseTax: (v: string) => void;
+  repairMaintenance: string;
+  setRepairMaintenance: (v: string) => void;
+  interest: string;
+  setInterest: (v: string) => void;
+  previousDue: string;
+  setPreviousDue: (v: string) => void;
+}) {
+  const totalMaintenance = [
+    serviceCharges,
+    nonOccupancyCharges,
+    liftMaintenance,
+    parkingCharges,
+    sinkingFund,
+    otherCharges,
+    houseTax,
+    repairMaintenance,
+    interest,
+  ].reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const grandTotal = totalMaintenance + (Number(previousDue) || 0);
+
+  return (
+    <div className="space-y-3">
+      <Separator />
+      <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wide">
+        Maintenance Breakdown
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Service Charges (₹)</Label>
+          <Input
+            type="number"
+            value={serviceCharges}
+            onChange={(e) => setServiceCharges(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Non-Occupancy Charges (₹)</Label>
+          <Input
+            type="number"
+            value={nonOccupancyCharges}
+            onChange={(e) => setWaterCharges(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Lift Maintenance (₹)</Label>
+          <Input
+            type="number"
+            value={liftMaintenance}
+            onChange={(e) => setLiftMaintenance(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Parking Charges (₹)</Label>
+          <Input
+            type="number"
+            value={parkingCharges}
+            onChange={(e) => setParkingCharges(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Sinking Fund (₹)</Label>
+          <Input
+            type="number"
+            value={sinkingFund}
+            onChange={(e) => setSinkingFund(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Other Charges (₹)</Label>
+          <Input
+            type="number"
+            value={otherCharges}
+            onChange={(e) => setOtherCharges(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">House Tax (₹)</Label>
+          <Input
+            type="number"
+            value={houseTax}
+            onChange={(e) => setHouseTax(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Repair & Maintenance (₹)</Label>
+          <Input
+            type="number"
+            value={repairMaintenance}
+            onChange={(e) => setRepairMaintenance(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="space-y-1.5">
+          <Label className="font-body text-sm">Interest (₹)</Label>
+          <Input
+            type="number"
+            value={interest}
+            onChange={(e) => setInterest(e.target.value)}
+            placeholder="0"
+            className="font-body"
+          />
+        </div>
+      </div>
+      <div
+        className="flex items-center justify-between px-3 py-2 rounded-lg"
+        style={{ background: "oklch(0.94 0.008 240)" }}
+      >
+        <span className="text-sm font-body text-muted-foreground">
+          Total Maintenance
+        </span>
+        <span className="font-body font-semibold">
+          ₹{totalMaintenance.toLocaleString("en-IN")}
+        </span>
+      </div>
+      <Separator />
+      <div className="space-y-1.5">
+        <Label className="font-body text-sm">Previous Due (₹)</Label>
+        <Input
+          type="number"
+          value={previousDue}
+          onChange={(e) => setPreviousDue(e.target.value)}
+          placeholder="0"
+          className="font-body"
+        />
+      </div>
+      <div
+        className="flex items-center justify-between px-3 py-2.5 rounded-lg"
+        style={{ background: "oklch(0.92 0.06 240)" }}
+      >
+        <span className="text-sm font-body font-semibold">Grand Total</span>
+        <span
+          className="font-display font-bold text-base"
+          style={{ color: "oklch(0.35 0.15 243)" }}
+        >
+          ₹{grandTotal.toLocaleString("en-IN")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // ─── Add Unit Dialog ──────────────────────────────────────────────────────────
 
 function AddUnitDialog({
@@ -250,38 +458,120 @@ function AddUnitDialog({
   const [floor, setFloor] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [isOccupied, setIsOccupied] = useState("true");
-  const [monthlyMaintenance, setMonthlyMaintenance] = useState("");
+
+  // Extended unit fields
+  const [area, setArea] = useState("");
+  const [ownershipType, setOwnershipType] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  const [memberCount, setMemberCount] = useState("");
+  const [unitType, setUnitType] = useState("");
+
+  // Breakdown
+  const [serviceCharges, setServiceCharges] = useState("");
+  const [nonOccupancyCharges, setWaterCharges] = useState("");
+  const [liftMaintenance, setLiftMaintenance] = useState("");
+  const [parkingCharges, setParkingCharges] = useState("");
+  const [sinkingFund, setSinkingFund] = useState("");
+  const [otherCharges, setOtherCharges] = useState("");
+  const [houseTax, setHouseTax] = useState("");
+  const [repairMaintenance, setRepairMaintenance] = useState("");
+  const [interest, setInterest] = useState("");
+  const [previousDue, setPreviousDue] = useState("0");
+
+  const totalMaintenance = [
+    serviceCharges,
+    nonOccupancyCharges,
+    liftMaintenance,
+    parkingCharges,
+    sinkingFund,
+    otherCharges,
+    houseTax,
+    repairMaintenance,
+    interest,
+  ].reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const grandTotal = totalMaintenance + (Number(previousDue) || 0);
+
+  const resetForm = () => {
+    setTowerId("");
+    setUnitNumber("");
+    setFloor("");
+    setOwnerName("");
+    setIsOccupied("true");
+    setArea("");
+    setOwnershipType("");
+    setPhone("");
+    setEmail("");
+    setMemberCount("");
+    setUnitType("");
+    setServiceCharges("");
+    setWaterCharges("");
+    setLiftMaintenance("");
+    setParkingCharges("");
+    setSinkingFund("");
+    setOtherCharges("");
+    setHouseTax("");
+    setRepairMaintenance("");
+    setInterest("");
+    setPreviousDue("0");
+  };
 
   const handleCreate = () => {
-    if (!towerId || !unitNumber || !floor || !ownerName || !monthlyMaintenance)
+    if (
+      !towerId ||
+      !unitNumber ||
+      !floor ||
+      !ownerName ||
+      totalMaintenance === 0
+    )
       return;
+    const breakdown: MaintenanceBreakdown = {
+      serviceCharges: Number(serviceCharges) || 0,
+      nonOccupancyCharges: Number(nonOccupancyCharges) || 0,
+      liftMaintenance: Number(liftMaintenance) || 0,
+      parkingCharges: Number(parkingCharges) || 0,
+      sinkingFund: Number(sinkingFund) || 0,
+      otherCharges: Number(otherCharges) || 0,
+      houseTax: Number(houseTax) || 0,
+      repairMaintenance: Number(repairMaintenance) || 0,
+      interest: Number(interest) || 0,
+    };
     store.createUnit(
       Number(towerId),
       unitNumber,
       Number(floor),
       ownerName,
       isOccupied === "true",
-      Number(monthlyMaintenance),
+      grandTotal,
+      breakdown,
+      Number(previousDue) || 0,
+      area ? Number(area) : undefined,
+      ownershipType || undefined,
+      phone || undefined,
+      email || undefined,
+      memberCount ? Number(memberCount) : undefined,
+      unitType || undefined,
     );
     toast.success("Unit added successfully");
     setOpen(false);
-    setTowerId("");
-    setUnitNumber("");
-    setFloor("");
-    setOwnerName("");
-    setIsOccupied("true");
-    setMonthlyMaintenance("");
+    resetForm();
     onSuccess();
   };
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        setOpen(v);
+        if (!v) resetForm();
+      }}
+    >
       <DialogTrigger asChild>
         <Button size="sm" className="gap-2 font-body">
           <Plus className="w-4 h-4" /> Add Unit
         </Button>
       </DialogTrigger>
-      <DialogContent>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="font-display">Add New Unit</DialogTitle>
         </DialogHeader>
@@ -328,14 +618,20 @@ function AddUnitDialog({
               />
             </div>
             <div className="space-y-1.5">
-              <Label className="font-body">Monthly Maintenance (₹)</Label>
-              <Input
-                type="number"
-                value={monthlyMaintenance}
-                onChange={(e) => setMonthlyMaintenance(e.target.value)}
-                placeholder="e.g. 2500"
-                className="font-body"
-              />
+              <Label className="font-body">Occupancy Status</Label>
+              <Select value={isOccupied} onValueChange={setIsOccupied}>
+                <SelectTrigger className="font-body">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true" className="font-body">
+                    Occupied
+                  </SelectItem>
+                  <SelectItem value="false" className="font-body">
+                    Vacant
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="space-y-1.5">
@@ -347,22 +643,120 @@ function AddUnitDialog({
               className="font-body"
             />
           </div>
-          <div className="space-y-1.5">
-            <Label className="font-body">Occupancy Status</Label>
-            <Select value={isOccupied} onValueChange={setIsOccupied}>
-              <SelectTrigger className="font-body">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="true" className="font-body">
-                  Occupied
-                </SelectItem>
-                <SelectItem value="false" className="font-body">
-                  Vacant
-                </SelectItem>
-              </SelectContent>
-            </Select>
+
+          {/* Extended Unit Fields */}
+          <Separator />
+          <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wide">
+            Unit Details
+          </p>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="font-body">Area (Sqft)</Label>
+              <Input
+                type="number"
+                value={area}
+                onChange={(e) => setArea(e.target.value)}
+                placeholder="e.g. 1200"
+                className="font-body"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-body">Unit Type</Label>
+              <Select value={unitType} onValueChange={setUnitType}>
+                <SelectTrigger className="font-body">
+                  <SelectValue placeholder="Select type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {[
+                    "1RK",
+                    "Studio",
+                    "1BHK",
+                    "2BHK",
+                    "3BHK",
+                    "4BHK",
+                    "Penthouse",
+                    "Duplex",
+                    "Other",
+                  ].map((t) => (
+                    <SelectItem key={t} value={t} className="font-body">
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="font-body">Ownership Type</Label>
+              <Select value={ownershipType} onValueChange={setOwnershipType}>
+                <SelectTrigger className="font-body">
+                  <SelectValue placeholder="Select" />
+                </SelectTrigger>
+                <SelectContent>
+                  {["Owner", "Tenant", "Co-owner", "Sub-tenant"].map((t) => (
+                    <SelectItem key={t} value={t} className="font-body">
+                      {t}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-body">Member Count</Label>
+              <Input
+                type="number"
+                value={memberCount}
+                onChange={(e) => setMemberCount(e.target.value)}
+                placeholder="e.g. 4"
+                className="font-body"
+              />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1.5">
+              <Label className="font-body">Phone Number</Label>
+              <Input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="+91 98765 43210"
+                className="font-body"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-body">Email</Label>
+              <Input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="owner@email.com"
+                className="font-body"
+              />
+            </div>
+          </div>
+
+          <MaintenanceBreakdownFields
+            serviceCharges={serviceCharges}
+            setServiceCharges={setServiceCharges}
+            nonOccupancyCharges={nonOccupancyCharges}
+            setWaterCharges={setWaterCharges}
+            liftMaintenance={liftMaintenance}
+            setLiftMaintenance={setLiftMaintenance}
+            parkingCharges={parkingCharges}
+            setParkingCharges={setParkingCharges}
+            sinkingFund={sinkingFund}
+            setSinkingFund={setSinkingFund}
+            otherCharges={otherCharges}
+            setOtherCharges={setOtherCharges}
+            houseTax={houseTax}
+            setHouseTax={setHouseTax}
+            repairMaintenance={repairMaintenance}
+            setRepairMaintenance={setRepairMaintenance}
+            interest={interest}
+            setInterest={setInterest}
+            previousDue={previousDue}
+            setPreviousDue={setPreviousDue}
+          />
           <Button
             className="w-full font-body"
             onClick={handleCreate}
@@ -371,7 +765,7 @@ function AddUnitDialog({
               !unitNumber ||
               !floor ||
               !ownerName ||
-              !monthlyMaintenance
+              totalMaintenance === 0
             }
           >
             Create Unit
@@ -402,9 +796,62 @@ function EditUnitDialog({
   const [isOccupied, setIsOccupied] = useState(
     unit.isOccupied ? "true" : "false",
   );
-  const [monthlyMaintenance, setMonthlyMaintenance] = useState(
-    unit.monthlyMaintenance.toString(),
+
+  // Extended unit fields
+  const [area, setArea] = useState((unit.area ?? "").toString());
+  const [ownershipType, setOwnershipType] = useState(unit.ownershipType ?? "");
+  const [phone, setPhone] = useState(unit.phone ?? "");
+  const [email, setEmail] = useState(unit.email ?? "");
+  const [memberCount, setMemberCount] = useState(
+    (unit.memberCount ?? "").toString(),
   );
+  const [unitType, setUnitType] = useState(unit.unitType ?? "");
+
+  // Breakdown - pre-fill from existing breakdown if available
+  const bd = unit.maintenanceBreakdown;
+  const [serviceCharges, setServiceCharges] = useState(
+    bd ? bd.serviceCharges.toString() : unit.monthlyMaintenance.toString(),
+  );
+  const [nonOccupancyCharges, setWaterCharges] = useState(
+    bd ? bd.nonOccupancyCharges.toString() : "0",
+  );
+  const [liftMaintenance, setLiftMaintenance] = useState(
+    bd ? bd.liftMaintenance.toString() : "0",
+  );
+  const [parkingCharges, setParkingCharges] = useState(
+    bd ? bd.parkingCharges.toString() : "0",
+  );
+  const [sinkingFund, setSinkingFund] = useState(
+    bd ? bd.sinkingFund.toString() : "0",
+  );
+  const [otherCharges, setOtherCharges] = useState(
+    bd ? bd.otherCharges.toString() : "0",
+  );
+  const [houseTax, setHouseTax] = useState(
+    bd ? (bd.houseTax ?? 0).toString() : "0",
+  );
+  const [repairMaintenance, setRepairMaintenance] = useState(
+    bd ? (bd.repairMaintenance ?? 0).toString() : "0",
+  );
+  const [interest, setInterest] = useState(
+    bd ? (bd.interest ?? 0).toString() : "0",
+  );
+  const [previousDue, setPreviousDue] = useState(
+    (unit.previousDue ?? 0).toString(),
+  );
+
+  const totalMaintenance = [
+    serviceCharges,
+    nonOccupancyCharges,
+    liftMaintenance,
+    parkingCharges,
+    sinkingFund,
+    otherCharges,
+    houseTax,
+    repairMaintenance,
+    interest,
+  ].reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const grandTotal = totalMaintenance + (Number(previousDue) || 0);
 
   const handleOpen = () => {
     setTowerId(unit.towerId.toString());
@@ -412,13 +859,48 @@ function EditUnitDialog({
     setFloor(unit.floor.toString());
     setOwnerName(unit.ownerName);
     setIsOccupied(unit.isOccupied ? "true" : "false");
-    setMonthlyMaintenance(unit.monthlyMaintenance.toString());
+    setArea((unit.area ?? "").toString());
+    setOwnershipType(unit.ownershipType ?? "");
+    setPhone(unit.phone ?? "");
+    setEmail(unit.email ?? "");
+    setMemberCount((unit.memberCount ?? "").toString());
+    setUnitType(unit.unitType ?? "");
+    const b = unit.maintenanceBreakdown;
+    setServiceCharges(
+      b ? b.serviceCharges.toString() : unit.monthlyMaintenance.toString(),
+    );
+    setWaterCharges(b ? b.nonOccupancyCharges.toString() : "0");
+    setLiftMaintenance(b ? b.liftMaintenance.toString() : "0");
+    setParkingCharges(b ? b.parkingCharges.toString() : "0");
+    setSinkingFund(b ? b.sinkingFund.toString() : "0");
+    setOtherCharges(b ? b.otherCharges.toString() : "0");
+    setHouseTax(b ? (b.houseTax ?? 0).toString() : "0");
+    setRepairMaintenance(b ? (b.repairMaintenance ?? 0).toString() : "0");
+    setInterest(b ? (b.interest ?? 0).toString() : "0");
+    setPreviousDue((unit.previousDue ?? 0).toString());
     setOpen(true);
   };
 
   const handleSave = () => {
-    if (!towerId || !unitNumber || !floor || !ownerName || !monthlyMaintenance)
+    if (
+      !towerId ||
+      !unitNumber ||
+      !floor ||
+      !ownerName ||
+      totalMaintenance === 0
+    )
       return;
+    const breakdown: MaintenanceBreakdown = {
+      serviceCharges: Number(serviceCharges) || 0,
+      nonOccupancyCharges: Number(nonOccupancyCharges) || 0,
+      liftMaintenance: Number(liftMaintenance) || 0,
+      parkingCharges: Number(parkingCharges) || 0,
+      sinkingFund: Number(sinkingFund) || 0,
+      otherCharges: Number(otherCharges) || 0,
+      houseTax: Number(houseTax) || 0,
+      repairMaintenance: Number(repairMaintenance) || 0,
+      interest: Number(interest) || 0,
+    };
     store.updateUnit(
       unit.id,
       Number(towerId),
@@ -426,7 +908,15 @@ function EditUnitDialog({
       Number(floor),
       ownerName,
       isOccupied === "true",
-      Number(monthlyMaintenance),
+      grandTotal,
+      breakdown,
+      Number(previousDue) || 0,
+      area ? Number(area) : undefined,
+      ownershipType || undefined,
+      phone || undefined,
+      email || undefined,
+      memberCount ? Number(memberCount) : undefined,
+      unitType || undefined,
     );
     toast.success("Unit updated successfully");
     setOpen(false);
@@ -445,7 +935,7 @@ function EditUnitDialog({
         <Edit2 className="w-3.5 h-3.5" />
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="font-display">Edit Unit</DialogTitle>
           </DialogHeader>
@@ -492,14 +982,20 @@ function EditUnitDialog({
                 />
               </div>
               <div className="space-y-1.5">
-                <Label className="font-body">Monthly Maintenance (₹)</Label>
-                <Input
-                  type="number"
-                  value={monthlyMaintenance}
-                  onChange={(e) => setMonthlyMaintenance(e.target.value)}
-                  placeholder="e.g. 2500"
-                  className="font-body"
-                />
+                <Label className="font-body">Occupancy Status</Label>
+                <Select value={isOccupied} onValueChange={setIsOccupied}>
+                  <SelectTrigger className="font-body">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="true" className="font-body">
+                      Occupied
+                    </SelectItem>
+                    <SelectItem value="false" className="font-body">
+                      Vacant
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
             <div className="space-y-1.5">
@@ -511,22 +1007,119 @@ function EditUnitDialog({
                 className="font-body"
               />
             </div>
-            <div className="space-y-1.5">
-              <Label className="font-body">Occupancy Status</Label>
-              <Select value={isOccupied} onValueChange={setIsOccupied}>
-                <SelectTrigger className="font-body">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="true" className="font-body">
-                    Occupied
-                  </SelectItem>
-                  <SelectItem value="false" className="font-body">
-                    Vacant
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+
+            {/* Extended Unit Fields */}
+            <Separator />
+            <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wide">
+              Unit Details
+            </p>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-body">Area (Sqft)</Label>
+                <Input
+                  type="number"
+                  value={area}
+                  onChange={(e) => setArea(e.target.value)}
+                  placeholder="e.g. 1200"
+                  className="font-body"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-body">Unit Type</Label>
+                <Select value={unitType} onValueChange={setUnitType}>
+                  <SelectTrigger className="font-body">
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {[
+                      "Studio",
+                      "1BHK",
+                      "2BHK",
+                      "3BHK",
+                      "4BHK",
+                      "Penthouse",
+                      "Duplex",
+                      "Other",
+                    ].map((t) => (
+                      <SelectItem key={t} value={t} className="font-body">
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-body">Ownership Type</Label>
+                <Select value={ownershipType} onValueChange={setOwnershipType}>
+                  <SelectTrigger className="font-body">
+                    <SelectValue placeholder="Select" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {["Owner", "Tenant", "Co-owner", "Sub-tenant"].map((t) => (
+                      <SelectItem key={t} value={t} className="font-body">
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-body">Member Count</Label>
+                <Input
+                  type="number"
+                  value={memberCount}
+                  onChange={(e) => setMemberCount(e.target.value)}
+                  placeholder="e.g. 4"
+                  className="font-body"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="font-body">Phone Number</Label>
+                <Input
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="font-body"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="font-body">Email</Label>
+                <Input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="owner@email.com"
+                  className="font-body"
+                />
+              </div>
+            </div>
+
+            <MaintenanceBreakdownFields
+              serviceCharges={serviceCharges}
+              setServiceCharges={setServiceCharges}
+              nonOccupancyCharges={nonOccupancyCharges}
+              setWaterCharges={setWaterCharges}
+              liftMaintenance={liftMaintenance}
+              setLiftMaintenance={setLiftMaintenance}
+              parkingCharges={parkingCharges}
+              setParkingCharges={setParkingCharges}
+              sinkingFund={sinkingFund}
+              setSinkingFund={setSinkingFund}
+              otherCharges={otherCharges}
+              setOtherCharges={setOtherCharges}
+              houseTax={houseTax}
+              setHouseTax={setHouseTax}
+              repairMaintenance={repairMaintenance}
+              setRepairMaintenance={setRepairMaintenance}
+              interest={interest}
+              setInterest={setInterest}
+              previousDue={previousDue}
+              setPreviousDue={setPreviousDue}
+            />
             <Button
               className="w-full font-body"
               onClick={handleSave}
@@ -535,7 +1128,7 @@ function EditUnitDialog({
                 !unitNumber ||
                 !floor ||
                 !ownerName ||
-                !monthlyMaintenance
+                totalMaintenance === 0
               }
             >
               Save Changes

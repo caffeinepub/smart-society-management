@@ -39,6 +39,18 @@ export interface Tower {
   societyId: number; // which society this tower belongs to
 }
 
+export interface MaintenanceBreakdown {
+  serviceCharges: number;
+  nonOccupancyCharges: number;
+  liftMaintenance: number;
+  parkingCharges: number;
+  sinkingFund: number;
+  otherCharges: number;
+  houseTax: number;
+  repairMaintenance: number;
+  interest: number;
+}
+
 export interface Unit {
   id: number;
   towerId: number;
@@ -46,16 +58,28 @@ export interface Unit {
   floor: number;
   ownerName: string;
   isOccupied: boolean;
-  monthlyMaintenance: number;
+  monthlyMaintenance: number; // grand total (breakdown sum + previousDue)
+  maintenanceBreakdown?: MaintenanceBreakdown;
+  previousDue?: number;
+  // Extended unit details
+  area?: number; // in sqft
+  ownershipType?: string; // e.g. "Owner", "Tenant", "Co-owner"
+  phone?: string;
+  email?: string;
+  memberCount?: number;
+  unitType?: string; // e.g. "1BHK", "2BHK", "3BHK", "Studio", "Penthouse"
 }
 
 export interface BillBreakdown {
-  baseMaintenance: number;
-  waterCharges: number;
+  serviceCharges: number;
+  nonOccupancyCharges: number;
   liftMaintenance: number;
   parkingCharges: number;
   sinkingFund: number;
   otherCharges: number;
+  houseTax: number;
+  repairMaintenance: number;
+  interest: number;
 }
 
 export interface Bill {
@@ -314,12 +338,15 @@ function buildSeedData(): StoreState {
       previousDue: 0,
       grandTotal: 3500,
       breakdown: {
-        baseMaintenance: 2500,
-        waterCharges: 300,
+        serviceCharges: 2500,
+        nonOccupancyCharges: 300,
         liftMaintenance: 300,
         parkingCharges: 200,
         sinkingFund: 100,
         otherCharges: 100,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
@@ -334,12 +361,15 @@ function buildSeedData(): StoreState {
       previousDue: 0,
       grandTotal: 3500,
       breakdown: {
-        baseMaintenance: 2500,
-        waterCharges: 300,
+        serviceCharges: 2500,
+        nonOccupancyCharges: 300,
         liftMaintenance: 300,
         parkingCharges: 200,
         sinkingFund: 100,
         otherCharges: 100,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
@@ -354,12 +384,15 @@ function buildSeedData(): StoreState {
       previousDue: 0,
       grandTotal: 3000,
       breakdown: {
-        baseMaintenance: 2200,
-        waterCharges: 250,
+        serviceCharges: 2200,
+        nonOccupancyCharges: 250,
         liftMaintenance: 250,
         parkingCharges: 150,
         sinkingFund: 100,
         otherCharges: 50,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
@@ -374,12 +407,15 @@ function buildSeedData(): StoreState {
       previousDue: 0,
       grandTotal: 2500,
       breakdown: {
-        baseMaintenance: 1800,
-        waterCharges: 200,
+        serviceCharges: 1800,
+        nonOccupancyCharges: 200,
         liftMaintenance: 200,
         parkingCharges: 150,
         sinkingFund: 100,
         otherCharges: 50,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
@@ -394,12 +430,15 @@ function buildSeedData(): StoreState {
       previousDue: 0,
       grandTotal: 4000,
       breakdown: {
-        baseMaintenance: 2900,
-        waterCharges: 350,
+        serviceCharges: 2900,
+        nonOccupancyCharges: 350,
         liftMaintenance: 350,
         parkingCharges: 200,
         sinkingFund: 100,
         otherCharges: 100,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-03-10`,
       month: 2,
@@ -414,12 +453,15 @@ function buildSeedData(): StoreState {
       previousDue: 500,
       grandTotal: 3500,
       breakdown: {
-        baseMaintenance: 2200,
-        waterCharges: 250,
+        serviceCharges: 2200,
+        nonOccupancyCharges: 250,
         liftMaintenance: 250,
         parkingCharges: 150,
         sinkingFund: 100,
         otherCharges: 50,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-03-10`,
       month: 2,
@@ -434,12 +476,15 @@ function buildSeedData(): StoreState {
       previousDue: 2500,
       grandTotal: 5000,
       breakdown: {
-        baseMaintenance: 1800,
-        waterCharges: 200,
+        serviceCharges: 1800,
+        nonOccupancyCharges: 200,
         liftMaintenance: 200,
         parkingCharges: 150,
         sinkingFund: 100,
         otherCharges: 50,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-01-10`,
       month: 12,
@@ -454,12 +499,15 @@ function buildSeedData(): StoreState {
       previousDue: 0,
       grandTotal: 4500,
       breakdown: {
-        baseMaintenance: 3300,
-        waterCharges: 400,
+        serviceCharges: 3300,
+        nonOccupancyCharges: 400,
         liftMaintenance: 400,
         parkingCharges: 200,
         sinkingFund: 100,
         otherCharges: 100,
+        houseTax: 0,
+        repairMaintenance: 0,
+        interest: 0,
       },
       dueDate: `${CURRENT_YEAR}-03-10`,
       month: 2,
@@ -914,19 +962,52 @@ function loadFromStorage(): StoreState {
       }
       // Migrate bills: ensure breakdown/previousDue/grandTotal exist
       if (parsed.bills) {
-        parsed.bills = parsed.bills.map((b) => ({
-          ...b,
-          previousDue: b.previousDue ?? 0,
-          grandTotal: b.grandTotal ?? b.amount,
-          breakdown: b.breakdown ?? {
-            baseMaintenance: b.amount,
-            waterCharges: 0,
-            liftMaintenance: 0,
-            parkingCharges: 0,
-            sinkingFund: 0,
-            otherCharges: 0,
-          },
-        }));
+        parsed.bills = parsed.bills.map((b) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const bd = (b.breakdown ?? {}) as any;
+          const migratedBreakdown: BillBreakdown = {
+            serviceCharges: bd.serviceCharges ?? bd.baseMaintenance ?? b.amount,
+            nonOccupancyCharges: bd.nonOccupancyCharges ?? 0,
+            liftMaintenance: bd.liftMaintenance ?? 0,
+            parkingCharges: bd.parkingCharges ?? 0,
+            sinkingFund: bd.sinkingFund ?? 0,
+            otherCharges: bd.otherCharges ?? 0,
+            houseTax: bd.houseTax ?? 0,
+            repairMaintenance: bd.repairMaintenance ?? 0,
+            interest: bd.interest ?? 0,
+          };
+          return {
+            ...b,
+            previousDue: b.previousDue ?? 0,
+            grandTotal: b.grandTotal ?? b.amount,
+            breakdown: migratedBreakdown,
+          };
+        });
+      }
+      // Migrate units: ensure new fields exist
+      if (parsed.units) {
+        parsed.units = parsed.units.map((u) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const bd = u.maintenanceBreakdown as any;
+          if (
+            bd &&
+            bd.baseMaintenance !== undefined &&
+            bd.serviceCharges === undefined
+          ) {
+            u.maintenanceBreakdown = {
+              serviceCharges: bd.baseMaintenance,
+              nonOccupancyCharges: bd.nonOccupancyCharges ?? 0,
+              liftMaintenance: bd.liftMaintenance ?? 0,
+              parkingCharges: bd.parkingCharges ?? 0,
+              sinkingFund: bd.sinkingFund ?? 0,
+              otherCharges: bd.otherCharges ?? 0,
+              houseTax: bd.houseTax ?? 0,
+              repairMaintenance: bd.repairMaintenance ?? 0,
+              interest: bd.interest ?? 0,
+            };
+          }
+          return u;
+        });
       }
       return parsed;
     }
@@ -1102,6 +1183,14 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       ownerName: string,
       isOccupied: boolean,
       monthlyMaintenance: number,
+      maintenanceBreakdown?: MaintenanceBreakdown,
+      previousDue?: number,
+      area?: number,
+      ownershipType?: string,
+      phone?: string,
+      email?: string,
+      memberCount?: number,
+      unitType?: string,
     ): number => {
       const id = state.nextId;
       mutate((s) => ({
@@ -1116,6 +1205,14 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             ownerName,
             isOccupied,
             monthlyMaintenance,
+            maintenanceBreakdown,
+            previousDue: previousDue ?? 0,
+            area,
+            ownershipType,
+            phone,
+            email,
+            memberCount,
+            unitType,
           },
         ],
         nextId: s.nextId + 1,
@@ -1130,6 +1227,14 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       ownerName: string,
       isOccupied: boolean,
       monthlyMaintenance: number,
+      maintenanceBreakdown?: MaintenanceBreakdown,
+      previousDue?: number,
+      area?: number,
+      ownershipType?: string,
+      phone?: string,
+      email?: string,
+      memberCount?: number,
+      unitType?: string,
     ): void => {
       mutate((s) => ({
         ...s,
@@ -1143,6 +1248,14 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
                 ownerName,
                 isOccupied,
                 monthlyMaintenance,
+                maintenanceBreakdown,
+                previousDue: previousDue ?? 0,
+                area,
+                ownershipType,
+                phone,
+                email,
+                memberCount,
+                unitType,
               }
             : u,
         ),
@@ -1165,12 +1278,15 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
     ): number => {
       const id = state.nextId;
       const amount =
-        breakdown.baseMaintenance +
-        breakdown.waterCharges +
+        breakdown.serviceCharges +
+        breakdown.nonOccupancyCharges +
         breakdown.liftMaintenance +
         breakdown.parkingCharges +
         breakdown.sinkingFund +
-        breakdown.otherCharges;
+        breakdown.otherCharges +
+        breakdown.houseTax +
+        breakdown.repairMaintenance +
+        breakdown.interest;
       const grandTotal = amount + previousDue;
       mutate((s) => ({
         ...s,
@@ -1193,6 +1309,43 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
         nextId: s.nextId + 1,
       }));
       return id;
+    },
+    updateBill: (
+      id: number,
+      breakdown: BillBreakdown,
+      previousDue: number,
+      dueDate: string,
+      month: number,
+      year: number,
+    ): void => {
+      const amount =
+        breakdown.serviceCharges +
+        breakdown.nonOccupancyCharges +
+        breakdown.liftMaintenance +
+        breakdown.parkingCharges +
+        breakdown.sinkingFund +
+        breakdown.otherCharges +
+        breakdown.houseTax +
+        breakdown.repairMaintenance +
+        breakdown.interest;
+      const grandTotal = amount + previousDue;
+      mutate((s) => ({
+        ...s,
+        bills: s.bills.map((b) =>
+          b.id === id
+            ? {
+                ...b,
+                breakdown,
+                amount,
+                previousDue,
+                grandTotal,
+                dueDate,
+                month,
+                year,
+              }
+            : b,
+        ),
+      }));
     },
     recordPayment: (
       billId: number,
@@ -1453,6 +1606,9 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       }));
       return id;
     },
+
+    // Payments
+    getPayments: (): Payment[] => state.payments,
 
     // Expose state for hooks to use directly if needed
     _nextId: nextId,
