@@ -104,168 +104,259 @@ function formatDate(isoString: string): string {
   }
 }
 
-function printBillPDF(bill: Bill, societyInfo: SocietyInfo) {
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText =
-    "position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;";
-  document.body.appendChild(iframe);
+function generateBillNumber(billId: number, year: number): string {
+  return `${year}-${String(billId).padStart(4, "0")}`;
+}
 
+function numberToWords(amount: number): string {
+  if (amount === 0) return "Zero Only";
+  const ones = [
+    "",
+    "One",
+    "Two",
+    "Three",
+    "Four",
+    "Five",
+    "Six",
+    "Seven",
+    "Eight",
+    "Nine",
+    "Ten",
+    "Eleven",
+    "Twelve",
+    "Thirteen",
+    "Fourteen",
+    "Fifteen",
+    "Sixteen",
+    "Seventeen",
+    "Eighteen",
+    "Nineteen",
+  ];
+  const tens = [
+    "",
+    "",
+    "Twenty",
+    "Thirty",
+    "Forty",
+    "Fifty",
+    "Sixty",
+    "Seventy",
+    "Eighty",
+    "Ninety",
+  ];
+  function convert(n: number): string {
+    if (n < 20) return ones[n];
+    if (n < 100)
+      return `${tens[Math.floor(n / 10)]}${n % 10 ? ` ${ones[n % 10]}` : ""}`;
+    if (n < 1000)
+      return `${ones[Math.floor(n / 100)]} Hundred${n % 100 ? ` ${convert(n % 100)}` : ""}`;
+    if (n < 100000)
+      return `${convert(Math.floor(n / 1000))} Thousand${n % 1000 ? ` ${convert(n % 1000)}` : ""}`;
+    if (n < 10000000)
+      return `${convert(Math.floor(n / 100000))} Lakh${n % 100000 ? ` ${convert(n % 100000)}` : ""}`;
+    return `${convert(Math.floor(n / 10000000))} Crore${n % 10000000 ? ` ${convert(n % 10000000)}` : ""}`;
+  }
+  const rupees = Math.floor(amount);
+  const paise = Math.round((amount - rupees) * 100);
+  let result = `Rupees ${convert(rupees)}`;
+  if (paise > 0) result += ` and ${convert(paise)} Paise`;
+  return `${result} Only`;
+}
+
+interface PdfUnitInfo {
+  ownerName: string;
+  area?: number;
+}
+
+function buildBillHTML(
+  bill: Bill,
+  societyInfo: SocietyInfo,
+  unitInfo: PdfUnitInfo,
+  showAmountInWords: boolean,
+  billingDateOverride?: string,
+): string {
   const monthName = months[bill.month - 1] ?? "";
-  const html = `<!DOCTYPE html>
+  const billNo = generateBillNumber(bill.id, bill.year);
+  const billingDate = billingDateOverride ?? bill.dueDate;
+  const areaDisplay = unitInfo.area ? `${unitInfo.area} Sq.Ft.` : "—";
+
+  const breakdownRows = [
+    { label: "Service Charges", value: bill.breakdown.serviceCharges },
+    {
+      label: "Non-Occupancy Charges",
+      value: bill.breakdown.nonOccupancyCharges,
+    },
+    { label: "Lift Maintenance", value: bill.breakdown.liftMaintenance },
+    { label: "Parking Charges", value: bill.breakdown.parkingCharges },
+    { label: "Sinking Fund", value: bill.breakdown.sinkingFund },
+    { label: "Other Charges", value: bill.breakdown.otherCharges },
+    { label: "House Tax", value: bill.breakdown.houseTax ?? 0 },
+    {
+      label: "Repair &amp; Maintenance Fund",
+      value: bill.breakdown.repairMaintenance ?? 0,
+    },
+    { label: "Interest", value: bill.breakdown.interest ?? 0 },
+  ];
+
+  const breakdownRowsHTML = breakdownRows
+    .map(
+      (row, i) =>
+        `<tr>
+          <td class="sr">${i + 1}</td>
+          <td class="particular">${row.label}</td>
+          <td class="amount">${row.value > 0 ? row.value.toLocaleString("en-IN") : "-"}</td>
+        </tr>`,
+    )
+    .join("");
+
+  const amountInWordsHTML = showAmountInWords
+    ? `<tr>
+        <td colspan="3" class="words-row">
+          <span class="words-label">Amount in Words:</span>
+          <span class="words-value">${numberToWords(bill.grandTotal)}</span>
+        </td>
+      </tr>`
+    : "";
+
+  return `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8"/>
 <title>Maintenance Bill – ${bill.unitNumber} – ${monthName} ${bill.year}</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 32px; background: #fff; }
-  .header { text-align: center; border-bottom: 2px solid #1e3a6e; padding-bottom: 16px; margin-bottom: 24px; }
-  .society-name { font-size: 22px; font-weight: 700; color: #1e3a6e; letter-spacing: 0.5px; }
-  .bill-title { font-size: 15px; font-weight: 600; color: #444; margin-top: 4px; letter-spacing: 2px; text-transform: uppercase; }
-  .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 24px; margin-bottom: 24px; background: #f7f9ff; padding: 14px 18px; border-radius: 6px; border: 1px solid #dde4f5; }
-  .meta-row { display: flex; flex-direction: column; gap: 1px; }
-  .meta-label { font-size: 10px; color: #666; font-weight: 600; text-transform: uppercase; letter-spacing: 0.6px; }
-  .meta-value { font-size: 13px; font-weight: 600; color: #111; }
-  table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
-  th { background: #1e3a6e; color: #fff; padding: 9px 12px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
-  td { padding: 9px 12px; border-bottom: 1px solid #eee; font-size: 13px; }
-  tr:last-child td { border-bottom: none; }
-  .subtotal-row td { background: #f0f4ff; font-weight: 600; }
-  .prev-due-row td { background: #fff8ee; color: #b45309; font-weight: 600; }
-  .grand-total-row td { background: #1e3a6e; color: #fff; font-weight: 700; font-size: 14px; }
-  .amount-col { text-align: right; }
-  .status-badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .status-paid { background: #d1fae5; color: #065f46; }
-  .status-pending { background: #fef9c3; color: #854d0e; }
-  .status-overdue { background: #fee2e2; color: #991b1b; }
-  .footer { margin-top: 32px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e5e7eb; padding-top: 12px; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 28px 36px; background: #fff; max-width: 720px; margin: 0 auto; }
+  .doc-header { font-size: 14px; font-weight: 700; text-align: center; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; color: #1a56db; border-bottom: 2px solid #1a56db; padding-bottom: 4px; }
+  .society-name { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: #1a56db; }
+  .society-reg { font-size: 11px; margin-top: 2px; }
+  .society-address { font-size: 11px; margin-top: 1px; }
+  .divider { border: none; border-top: 1px dashed #888; margin: 10px 0; }
+  .info-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
+  .info-table td { padding: 3px 0; font-size: 12px; vertical-align: top; }
+  .info-label { font-weight: normal; width: 120px; }
+  .info-value { font-weight: 600; }
+  .info-right { text-align: right; }
+  table.breakdown { width: 100%; border-collapse: collapse; margin-top: 2px; }
+  table.breakdown th { border-bottom: 1px solid #333; border-top: 1px solid #333; padding: 5px 8px; text-align: left; font-size: 11px; font-weight: 700; }
+  table.breakdown th.amount, table.breakdown td.amount { text-align: right; }
+  table.breakdown td { padding: 4px 8px; font-size: 12px; border: none; }
+  td.sr { width: 40px; }
+  td.particular { }
+  td.amount { width: 100px; text-align: right; }
+  .total-row td { padding-top: 5px; }
+  .prevdue-row td { padding-top: 2px; }
+  .grandtotal-divider td { border-top: 1px dashed #888; padding-top: 2px; }
+  .grandtotal-row td { font-weight: 700; font-size: 13px; padding-top: 4px; }
+  .words-row { padding-top: 6px; font-size: 11px; }
+  .words-label { font-weight: 600; }
+  .words-value { font-style: italic; margin-left: 4px; }
+  .note { font-size: 11px; margin-top: 12px; border-top: 1px dashed #888; padding-top: 8px; }
+  .signatory { margin-top: 24px; text-align: right; font-size: 12px; font-weight: 600; }
 </style>
 </head>
 <body>
-<div class="header">
+  <div class="doc-header">${showAmountInWords ? "Receipt" : "Maintenance Bill"}</div>
   <div class="society-name">${societyInfo.name}</div>
-  <div class="bill-title">Maintenance Bill</div>
-</div>
-<div class="meta-grid">
-  <div class="meta-row"><span class="meta-label">Unit Number</span><span class="meta-value">${bill.unitNumber}</span></div>
-  <div class="meta-row"><span class="meta-label">Bill Period</span><span class="meta-value">${monthName} ${bill.year}</span></div>
-  <div class="meta-row"><span class="meta-label">Due Date</span><span class="meta-value">${bill.dueDate}</span></div>
-  <div class="meta-row"><span class="meta-label">Status</span><span class="meta-value"><span class="status-badge status-${bill.status.toLowerCase()}">${bill.status}</span></span></div>
-</div>
-<table>
-  <thead>
+  <div class="society-reg">${societyInfo.registrationNumber}</div>
+  <div class="society-address">${societyInfo.address}${societyInfo.city ? `, ${societyInfo.city}` : ""}</div>
+
+  <hr class="divider"/>
+
+  <table class="info-table">
     <tr>
-      <th>Description</th>
-      <th class="amount-col">Amount (₹)</th>
+      <td class="info-label">Name</td>
+      <td class="info-value">${bill.unitNumber} &nbsp;&nbsp; ${unitInfo.ownerName}</td>
+      <td class="info-right"><span style="font-weight:normal">Bill no :</span> &nbsp;<strong>${billNo}</strong></td>
     </tr>
-  </thead>
-  <tbody>
-    <tr><td>Service Charges</td><td class="amount-col">${bill.breakdown.serviceCharges.toLocaleString("en-IN")}</td></tr>
-    <tr><td>Non-Occupancy Charges</td><td class="amount-col">${bill.breakdown.nonOccupancyCharges.toLocaleString("en-IN")}</td></tr>
-    <tr><td>Lift Maintenance</td><td class="amount-col">${bill.breakdown.liftMaintenance.toLocaleString("en-IN")}</td></tr>
-    <tr><td>Parking Charges</td><td class="amount-col">${bill.breakdown.parkingCharges.toLocaleString("en-IN")}</td></tr>
-    <tr><td>Sinking Fund</td><td class="amount-col">${bill.breakdown.sinkingFund.toLocaleString("en-IN")}</td></tr>
-    <tr><td>Other Charges</td><td class="amount-col">${bill.breakdown.otherCharges.toLocaleString("en-IN")}</td></tr>
-    ${(bill.breakdown.houseTax ?? 0) > 0 ? `<tr><td>House Tax</td><td class="amount-col">${(bill.breakdown.houseTax ?? 0).toLocaleString("en-IN")}</td></tr>` : ""}
-    ${(bill.breakdown.repairMaintenance ?? 0) > 0 ? `<tr><td>Repair &amp; Maintenance</td><td class="amount-col">${(bill.breakdown.repairMaintenance ?? 0).toLocaleString("en-IN")}</td></tr>` : ""}
-    ${(bill.breakdown.interest ?? 0) > 0 ? `<tr><td>Interest</td><td class="amount-col">${(bill.breakdown.interest ?? 0).toLocaleString("en-IN")}</td></tr>` : ""}
-    <tr class="subtotal-row"><td>Total Maintenance</td><td class="amount-col">₹${bill.amount.toLocaleString("en-IN")}</td></tr>
-    <tr class="prev-due-row"><td>Previous Due</td><td class="amount-col">₹${bill.previousDue.toLocaleString("en-IN")}</td></tr>
-    <tr class="grand-total-row"><td>Grand Total</td><td class="amount-col">₹${bill.grandTotal.toLocaleString("en-IN")}</td></tr>
-  </tbody>
-</table>
-<div class="footer">This is a computer generated bill. For queries contact: ${societyInfo.contactPhone}</div>
+    <tr>
+      <td class="info-label">Area in Sq. Ft.</td>
+      <td class="info-value">${areaDisplay}</td>
+      <td></td>
+    </tr>
+    <tr>
+      <td class="info-label">Bill Month:</td>
+      <td class="info-value">${monthName.slice(0, 3)}-${String(bill.year).slice(-2)}</td>
+      <td class="info-right"><span style="font-weight:normal">Billing Date :</span> &nbsp;<strong>${billingDate}</strong></td>
+    </tr>
+  </table>
+
+  <hr class="divider"/>
+
+  <table class="breakdown">
+    <thead>
+      <tr>
+        <th class="sr">Sr No</th>
+        <th class="particular">Particulars</th>
+        <th class="amount">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${breakdownRowsHTML}
+      <tr class="grandtotal-divider"><td colspan="3" style="border-top:1px dashed #888;padding-top:0;height:6px;"></td></tr>
+      <tr class="total-row">
+        <td colspan="2"><strong>Total</strong></td>
+        <td class="amount"><strong>${bill.amount.toLocaleString("en-IN")}</strong></td>
+      </tr>
+      <tr class="prevdue-row">
+        <td colspan="2">Previous Dues</td>
+        <td class="amount">${bill.previousDue > 0 ? bill.previousDue.toLocaleString("en-IN") : "-"}</td>
+      </tr>
+      <tr class="grandtotal-divider"><td colspan="3" style="border-top:1px dashed #888;padding-top:0;height:6px;"></td></tr>
+      <tr class="grandtotal-row">
+        <td colspan="2">Grand Total</td>
+        <td class="amount">${bill.grandTotal.toLocaleString("en-IN")}</td>
+      </tr>
+      ${amountInWordsHTML}
+    </tbody>
+  </table>
+
+  <div class="note">
+    Note : This is a system generated bill, does not require signature.<br/>
+    Bill to be paid by 20th of every month.
+  </div>
+  <div class="signatory">Chairman / Secretary / Treasurer</div>
 </body>
 </html>`;
+}
 
-  const doc = iframe.contentWindow?.document;
-  if (!doc) return;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
+function downloadHTMLasPDF(html: string, filename: string) {
+  const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
   setTimeout(() => {
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
-  }, 300);
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, 200);
+}
+
+function printBillPDF(
+  bill: Bill,
+  societyInfo: SocietyInfo,
+  unitInfo: PdfUnitInfo,
+) {
+  const monthName = months[bill.month - 1] ?? "";
+  const billNo = generateBillNumber(bill.id, bill.year);
+  const html = buildBillHTML(bill, societyInfo, unitInfo, false);
+  const filename = `Bill_${billNo}_${bill.unitNumber}_${monthName}${bill.year}.html`;
+  downloadHTMLasPDF(html, filename);
 }
 
 function printReceiptPDF(
   bill: Bill,
   payment: Payment,
   societyInfo: SocietyInfo,
+  unitInfo: PdfUnitInfo,
 ) {
-  const iframe = document.createElement("iframe");
-  iframe.style.cssText =
-    "position:fixed;top:-9999px;left:-9999px;width:210mm;height:297mm;border:none;";
-  document.body.appendChild(iframe);
-
   const monthName = months[bill.month - 1] ?? "";
-  const receiptNo = `RCP-${bill.id}-${payment.id}`;
+  const billNo = generateBillNumber(bill.id, bill.year);
   const paymentDate = formatDate(payment.paidAt);
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8"/>
-<title>Payment Receipt – ${receiptNo}</title>
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 40px; background: #fff; }
-  .header { text-align: center; padding-bottom: 20px; margin-bottom: 28px; }
-  .society-name { font-size: 22px; font-weight: 700; color: #065f46; letter-spacing: 0.5px; }
-  .receipt-title { font-size: 15px; font-weight: 600; color: #444; margin-top: 4px; letter-spacing: 2px; text-transform: uppercase; }
-  .receipt-box { border: 2px solid #065f46; border-radius: 8px; padding: 28px 32px; max-width: 480px; margin: 0 auto; }
-  .receipt-no { text-align: right; font-size: 11px; color: #888; margin-bottom: 20px; }
-  .receipt-no strong { color: #065f46; font-size: 13px; }
-  .row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #f0f0f0; }
-  .row:last-of-type { border-bottom: none; }
-  .row-label { color: #666; font-size: 12px; }
-  .row-value { font-weight: 600; color: #111; font-size: 13px; }
-  .amount-row { background: #f0fdf4; padding: 12px 16px; border-radius: 6px; margin: 16px -4px; }
-  .amount-label { font-size: 12px; color: #065f46; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
-  .amount-value { font-size: 22px; font-weight: 700; color: #065f46; }
-  .thankyou { text-align: center; margin-top: 24px; font-size: 14px; color: #065f46; font-weight: 600; }
-  .checkmark { font-size: 40px; text-align: center; margin-bottom: 8px; }
-  .footer { margin-top: 32px; text-align: center; font-size: 11px; color: #888; border-top: 1px solid #e5e7eb; padding-top: 12px; }
-</style>
-</head>
-<body>
-<div class="header">
-  <div class="society-name">${societyInfo.name}</div>
-  <div class="receipt-title">Payment Receipt</div>
-</div>
-<div class="receipt-box">
-  <div class="receipt-no">Receipt No: <strong>${receiptNo}</strong></div>
-  <div class="checkmark">✅</div>
-  <div class="row"><span class="row-label">Unit Number</span><span class="row-value">${bill.unitNumber}</span></div>
-  <div class="row"><span class="row-label">Bill Period</span><span class="row-value">${monthName} ${bill.year}</span></div>
-  <div class="row"><span class="row-label">Payment Date</span><span class="row-value">${paymentDate}</span></div>
-  <div class="row"><span class="row-label">Payment Method</span><span class="row-value">${payment.paymentMethod}</span></div>
-  <div class="amount-row row">
-    <span class="amount-label">Amount Paid</span>
-    <span class="amount-value">₹${payment.amount.toLocaleString("en-IN")}</span>
-  </div>
-  <div class="thankyou">Thank you for your payment.</div>
-</div>
-<div class="footer">This is a computer generated receipt. For queries contact: ${societyInfo.contactPhone}</div>
-</body>
-</html>`;
-
-  const doc = iframe.contentWindow?.document;
-  if (!doc) return;
-  doc.open();
-  doc.write(html);
-  doc.close();
-
-  setTimeout(() => {
-    iframe.contentWindow?.print();
-    setTimeout(() => {
-      document.body.removeChild(iframe);
-    }, 1000);
-  }, 300);
+  const html = buildBillHTML(bill, societyInfo, unitInfo, true, paymentDate);
+  const filename = `Receipt_${billNo}_${bill.unitNumber}_${monthName}${bill.year}.html`;
+  downloadHTMLasPDF(html, filename);
 }
 
 // ─── Pay Bill Dialog ──────────────────────────────────────────────────────────
@@ -858,6 +949,7 @@ function ResidentBillingView() {
   const allBills = store.getBills();
   const allPayments = store.getPayments();
   const societyInfo = store.getSocietyInfo();
+  const allUnits = store.getUnits();
 
   // Resident only sees their own unit bills (A-101 = Rajesh Kumar demo unit)
   const myBills = allBills.filter((b) => b.unitNumber === "A-101");
@@ -1035,7 +1127,15 @@ function ResidentBillingView() {
                               size="sm"
                               className="text-xs font-body h-7 gap-1.5"
                               style={{ color: "oklch(0.52 0.18 243)" }}
-                              onClick={() => printBillPDF(bill, societyInfo)}
+                              onClick={() => {
+                                const u = allUnits.find(
+                                  (u) => u.unitNumber === bill.unitNumber,
+                                );
+                                printBillPDF(bill, societyInfo, {
+                                  ownerName: u?.ownerName ?? bill.unitNumber,
+                                  area: u?.area,
+                                });
+                              }}
                               title="Download Bill PDF"
                             >
                               <Download className="w-3.5 h-3.5" />
@@ -1048,9 +1148,15 @@ function ResidentBillingView() {
                                 size="sm"
                                 className="text-xs font-body h-7 gap-1.5"
                                 style={{ color: "oklch(0.45 0.18 155)" }}
-                                onClick={() =>
-                                  printReceiptPDF(bill, payment, societyInfo)
-                                }
+                                onClick={() => {
+                                  const u = allUnits.find(
+                                    (u) => u.unitNumber === bill.unitNumber,
+                                  );
+                                  printReceiptPDF(bill, payment, societyInfo, {
+                                    ownerName: u?.ownerName ?? bill.unitNumber,
+                                    area: u?.area,
+                                  });
+                                }}
                                 title="Download Receipt PDF"
                               >
                                 <FileCheck className="w-3.5 h-3.5" />
