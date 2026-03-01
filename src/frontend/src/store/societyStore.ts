@@ -187,6 +187,47 @@ export interface SalaryRecord {
   status: string; // "Paid" | "Pending" | "Partial"
 }
 
+export interface Expense {
+  id: number;
+  title: string;
+  category: string; // "Maintenance", "Utilities", "Staff Salary", "Security", "Cleaning", "Repairs", "Administrative", "Other"
+  amount: number;
+  description: string;
+  paidTo: string; // vendor / payee name
+  paidBy: string; // admin who recorded it
+  date: string; // YYYY-MM-DD
+  paymentMethod: string; // "Cash", "Bank Transfer", "Cheque", "UPI"
+  receiptNumber: string; // optional reference
+  societyId: number;
+}
+
+export interface Vehicle {
+  id: number;
+  unitId: number;
+  unitNumber: string;
+  ownerName: string;
+  vehicleNumber: string;
+  vehicleType: string; // "Car" | "Bike" | "Scooter" | "Other"
+  brand: string;
+  color: string;
+  societyId: number;
+}
+
+export interface AmcContract {
+  id: number;
+  equipmentName: string;
+  vendor: string;
+  contactPerson: string;
+  contactPhone: string;
+  contractStart: string; // YYYY-MM-DD
+  contractEnd: string; // YYYY-MM-DD
+  amount: number;
+  paymentMethod: string;
+  notes: string;
+  status: string; // "Active" | "Expired" | "Expiring Soon"
+  societyId: number;
+}
+
 // ─── Store state shape ────────────────────────────────────────────────────────
 
 interface StoreState {
@@ -204,6 +245,9 @@ interface StoreState {
   staff: Staff[];
   attendance: Attendance[];
   salaryRecords: SalaryRecord[];
+  expenses: Expense[];
+  vehicles: Vehicle[];
+  amcContracts: AmcContract[];
   nextId: number;
 }
 
@@ -905,6 +949,283 @@ function buildSeedData(): StoreState {
     },
   ];
 
+  const expenses: Expense[] = [
+    {
+      id: 101,
+      title: "Pump Room Repair",
+      category: "Repairs",
+      amount: 8500,
+      description:
+        "Replacement of submersible pump motor in basement pump room.",
+      paidTo: "Aqua Tech Services",
+      paidBy: "Admin",
+      date: `${CURRENT_YEAR}-01-15`,
+      paymentMethod: "Cheque",
+      receiptNumber: "AQ/2026/0115",
+      societyId: 1,
+    },
+    {
+      id: 102,
+      title: "Electricity Bill – Common Areas",
+      category: "Utilities",
+      amount: 12400,
+      description:
+        "Monthly electricity bill for lifts, parking lights, lobby, and common corridors.",
+      paidTo: "BESCOM",
+      paidBy: "Admin",
+      date: `${CURRENT_YEAR}-01-20`,
+      paymentMethod: "Bank Transfer",
+      receiptNumber: "BESCOM/JAN26",
+      societyId: 1,
+    },
+    {
+      id: 103,
+      title: "Garden Maintenance",
+      category: "Maintenance",
+      amount: 3200,
+      description:
+        "Monthly charges for garden upkeep, plant trimming, and watering.",
+      paidTo: "GreenLeaf Landscaping",
+      paidBy: "Admin",
+      date: `${CURRENT_YEAR}-01-31`,
+      paymentMethod: "Cash",
+      receiptNumber: "",
+      societyId: 1,
+    },
+    {
+      id: 104,
+      title: "Security Agency Bill – January",
+      category: "Security",
+      amount: 42000,
+      description:
+        "Monthly invoice from security agency for 3 guards (day + night shifts).",
+      paidTo: "Shield Security Services",
+      paidBy: "SuperAdmin",
+      date: `${CURRENT_YEAR}-02-05`,
+      paymentMethod: "Bank Transfer",
+      receiptNumber: "SSS/INV/2026/012",
+      societyId: 1,
+    },
+    {
+      id: 105,
+      title: "Lift AMC – Annual Contract",
+      category: "Maintenance",
+      amount: 18000,
+      description:
+        "Annual maintenance contract for 2 lifts in Tower A and Tower B.",
+      paidTo: "Otis Elevators Pvt Ltd",
+      paidBy: "SuperAdmin",
+      date: `${CURRENT_YEAR}-02-10`,
+      paymentMethod: "Cheque",
+      receiptNumber: "OTIS/AMC/2026",
+      societyId: 1,
+    },
+    {
+      id: 106,
+      title: "Housekeeping Supplies",
+      category: "Cleaning",
+      amount: 2750,
+      description:
+        "Purchase of phenyl, brooms, dustpans, and cleaning chemicals for common areas.",
+      paidTo: "Clean World Supplies",
+      paidBy: "Admin",
+      date: `${CURRENT_YEAR}-02-18`,
+      paymentMethod: "Cash",
+      receiptNumber: "",
+      societyId: 1,
+    },
+  ];
+
+  const vehicles: Vehicle[] = [
+    {
+      id: 151,
+      unitId: 1,
+      unitNumber: "A-101",
+      ownerName: "Rajesh Kumar",
+      vehicleNumber: "KA 01 AB 1234",
+      vehicleType: "Car",
+      brand: "Maruti Swift",
+      color: "White",
+      societyId: 1,
+    },
+    {
+      id: 152,
+      unitId: 1,
+      unitNumber: "A-101",
+      ownerName: "Rajesh Kumar",
+      vehicleNumber: "KA 01 CD 5678",
+      vehicleType: "Bike",
+      brand: "Honda Activa",
+      color: "Black",
+      societyId: 1,
+    },
+    {
+      id: 153,
+      unitId: 2,
+      unitNumber: "A-203",
+      ownerName: "Sunita Sharma",
+      vehicleNumber: "KA 02 EF 9012",
+      vehicleType: "Car",
+      brand: "Hyundai i20",
+      color: "Silver",
+      societyId: 1,
+    },
+    {
+      id: 154,
+      unitId: 3,
+      unitNumber: "A-301",
+      ownerName: "Amit Verma",
+      vehicleNumber: "KA 03 GH 3456",
+      vehicleType: "Car",
+      brand: "Toyota Innova",
+      color: "Grey",
+      societyId: 1,
+    },
+    {
+      id: 155,
+      unitId: 5,
+      unitNumber: "B-102",
+      ownerName: "Vikram Shah",
+      vehicleNumber: "KA 05 IJ 7890",
+      vehicleType: "Car",
+      brand: "Honda City",
+      color: "Blue",
+      societyId: 1,
+    },
+    {
+      id: 156,
+      unitId: 8,
+      unitNumber: "B-401",
+      ownerName: "Meena Pillai",
+      vehicleNumber: "KA 08 KL 1122",
+      vehicleType: "Scooter",
+      brand: "TVS Jupiter",
+      color: "Red",
+      societyId: 1,
+    },
+    {
+      id: 157,
+      unitId: 9,
+      unitNumber: "C-102",
+      ownerName: "Arjun Mehta",
+      vehicleNumber: "KA 09 MN 3344",
+      vehicleType: "Car",
+      brand: "Tata Nexon",
+      color: "Orange",
+      societyId: 1,
+    },
+    {
+      id: 158,
+      unitId: 12,
+      unitNumber: "C-302",
+      ownerName: "Lakshmi Patel",
+      vehicleNumber: "KA 12 OP 5566",
+      vehicleType: "Bike",
+      brand: "Royal Enfield",
+      color: "Black",
+      societyId: 1,
+    },
+  ];
+
+  const amcToday = new Date();
+  const expiringSoonDate = new Date(amcToday);
+  expiringSoonDate.setDate(expiringSoonDate.getDate() + 25);
+  const expiredDate = new Date(amcToday);
+  expiredDate.setDate(expiredDate.getDate() - 30);
+  const futureDate1 = new Date(amcToday);
+  futureDate1.setFullYear(futureDate1.getFullYear() + 1);
+  const futureDate2 = new Date(amcToday);
+  futureDate2.setMonth(futureDate2.getMonth() + 8);
+
+  const amcContracts: AmcContract[] = [
+    {
+      id: 161,
+      equipmentName: "Lift Tower A",
+      vendor: "Otis Elevators Pvt Ltd",
+      contactPerson: "Ramesh Naidu",
+      contactPhone: "+91 98001 11111",
+      contractStart: `${CURRENT_YEAR}-01-01`,
+      contractEnd: futureDate1.toISOString().slice(0, 10),
+      amount: 18000,
+      paymentMethod: "Cheque",
+      notes:
+        "Annual service contract includes 2 scheduled visits + emergency calls",
+      status: "Active",
+      societyId: 1,
+    },
+    {
+      id: 162,
+      equipmentName: "Lift Tower B",
+      vendor: "Otis Elevators Pvt Ltd",
+      contactPerson: "Ramesh Naidu",
+      contactPhone: "+91 98001 11111",
+      contractStart: `${CURRENT_YEAR}-01-01`,
+      contractEnd: expiringSoonDate.toISOString().slice(0, 10),
+      amount: 18000,
+      paymentMethod: "Cheque",
+      notes: "Renewal due soon",
+      status: "Expiring Soon",
+      societyId: 1,
+    },
+    {
+      id: 163,
+      equipmentName: "Water Pump (Submersible)",
+      vendor: "Aqua Tech Services",
+      contactPerson: "Sunil Kamath",
+      contactPhone: "+91 99002 22222",
+      contractStart: `${CURRENT_YEAR - 1}-06-01`,
+      contractEnd: expiredDate.toISOString().slice(0, 10),
+      amount: 8500,
+      paymentMethod: "Bank Transfer",
+      notes: "Expired – renewal pending approval",
+      status: "Expired",
+      societyId: 1,
+    },
+    {
+      id: 164,
+      equipmentName: "Fire Safety Equipment",
+      vendor: "FireSafe India",
+      contactPerson: "Anil Sharma",
+      contactPhone: "+91 97003 33333",
+      contractStart: `${CURRENT_YEAR}-02-01`,
+      contractEnd: futureDate1.toISOString().slice(0, 10),
+      amount: 12000,
+      paymentMethod: "Bank Transfer",
+      notes:
+        "Covers fire extinguisher refilling, hydrant checks, and alarm testing",
+      status: "Active",
+      societyId: 1,
+    },
+    {
+      id: 165,
+      equipmentName: "CCTV System",
+      vendor: "SecureVision Technologies",
+      contactPerson: "Pradeep Menon",
+      contactPhone: "+91 96004 44444",
+      contractStart: `${CURRENT_YEAR}-01-15`,
+      contractEnd: futureDate2.toISOString().slice(0, 10),
+      amount: 6500,
+      paymentMethod: "UPI",
+      notes: "32 cameras – maintenance and DVR backup support",
+      status: "Active",
+      societyId: 1,
+    },
+    {
+      id: 166,
+      equipmentName: "Generator (DG Set)",
+      vendor: "Power Solutions Pvt Ltd",
+      contactPerson: "Mahesh Reddy",
+      contactPhone: "+91 95005 55555",
+      contractStart: `${CURRENT_YEAR - 1}-04-01`,
+      contractEnd: expiringSoonDate.toISOString().slice(0, 10),
+      amount: 15000,
+      paymentMethod: "Cheque",
+      notes: "Quarterly service + fuel top-up not included",
+      status: "Expiring Soon",
+      societyId: 1,
+    },
+  ];
+
   return {
     societyInfo: {
       name: "Prestige Lakeside Habitat",
@@ -926,6 +1247,9 @@ function buildSeedData(): StoreState {
     staff,
     attendance,
     salaryRecords,
+    expenses,
+    vehicles,
+    amcContracts,
     nextId: 200,
   };
 }
@@ -1008,6 +1332,18 @@ function loadFromStorage(): StoreState {
           }
           return u;
         });
+      }
+      // Migrate: ensure expenses array exists
+      if (!parsed.expenses) {
+        parsed.expenses = [];
+      }
+      // Migrate: ensure vehicles array exists
+      if (!parsed.vehicles) {
+        parsed.vehicles = [];
+      }
+      // Migrate: ensure amcContracts array exists
+      if (!parsed.amcContracts) {
+        parsed.amcContracts = [];
       }
       return parsed;
     }
@@ -1609,6 +1945,236 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
 
     // Payments
     getPayments: (): Payment[] => state.payments,
+
+    // Expenses
+    getExpenses: (): Expense[] => state.expenses,
+    createExpense: (
+      title: string,
+      category: string,
+      amount: number,
+      description: string,
+      paidTo: string,
+      paidBy: string,
+      date: string,
+      paymentMethod: string,
+      receiptNumber: string,
+      societyId: number,
+    ): number => {
+      const id = state.nextId;
+      mutate((s) => ({
+        ...s,
+        expenses: [
+          ...s.expenses,
+          {
+            id,
+            title,
+            category,
+            amount,
+            description,
+            paidTo,
+            paidBy,
+            date,
+            paymentMethod,
+            receiptNumber,
+            societyId,
+          },
+        ],
+        nextId: s.nextId + 1,
+      }));
+      return id;
+    },
+    updateExpense: (
+      id: number,
+      title: string,
+      category: string,
+      amount: number,
+      description: string,
+      paidTo: string,
+      paidBy: string,
+      date: string,
+      paymentMethod: string,
+      receiptNumber: string,
+      societyId: number,
+    ): void => {
+      mutate((s) => ({
+        ...s,
+        expenses: s.expenses.map((e) =>
+          e.id === id
+            ? {
+                id,
+                title,
+                category,
+                amount,
+                description,
+                paidTo,
+                paidBy,
+                date,
+                paymentMethod,
+                receiptNumber,
+                societyId,
+              }
+            : e,
+        ),
+      }));
+    },
+    deleteExpense: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        expenses: s.expenses.filter((e) => e.id !== id),
+      }));
+    },
+
+    // Vehicles
+    getVehicles: (): Vehicle[] => state.vehicles,
+    createVehicle: (
+      unitId: number,
+      unitNumber: string,
+      ownerName: string,
+      vehicleNumber: string,
+      vehicleType: string,
+      brand: string,
+      color: string,
+      societyId: number,
+    ): number => {
+      const id = state.nextId;
+      mutate((s) => ({
+        ...s,
+        vehicles: [
+          ...s.vehicles,
+          {
+            id,
+            unitId,
+            unitNumber,
+            ownerName,
+            vehicleNumber,
+            vehicleType,
+            brand,
+            color,
+            societyId,
+          },
+        ],
+        nextId: s.nextId + 1,
+      }));
+      return id;
+    },
+    updateVehicle: (
+      id: number,
+      unitId: number,
+      unitNumber: string,
+      ownerName: string,
+      vehicleNumber: string,
+      vehicleType: string,
+      brand: string,
+      color: string,
+      societyId: number,
+    ): void => {
+      mutate((s) => ({
+        ...s,
+        vehicles: s.vehicles.map((v) =>
+          v.id === id
+            ? {
+                id,
+                unitId,
+                unitNumber,
+                ownerName,
+                vehicleNumber,
+                vehicleType,
+                brand,
+                color,
+                societyId,
+              }
+            : v,
+        ),
+      }));
+    },
+    deleteVehicle: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        vehicles: s.vehicles.filter((v) => v.id !== id),
+      }));
+    },
+
+    // AMC Contracts
+    getAmcContracts: (): AmcContract[] => state.amcContracts,
+    createAmcContract: (
+      equipmentName: string,
+      vendor: string,
+      contactPerson: string,
+      contactPhone: string,
+      contractStart: string,
+      contractEnd: string,
+      amount: number,
+      paymentMethod: string,
+      notes: string,
+      status: string,
+      societyId: number,
+    ): number => {
+      const id = state.nextId;
+      mutate((s) => ({
+        ...s,
+        amcContracts: [
+          ...s.amcContracts,
+          {
+            id,
+            equipmentName,
+            vendor,
+            contactPerson,
+            contactPhone,
+            contractStart,
+            contractEnd,
+            amount,
+            paymentMethod,
+            notes,
+            status,
+            societyId,
+          },
+        ],
+        nextId: s.nextId + 1,
+      }));
+      return id;
+    },
+    updateAmcContract: (
+      id: number,
+      equipmentName: string,
+      vendor: string,
+      contactPerson: string,
+      contactPhone: string,
+      contractStart: string,
+      contractEnd: string,
+      amount: number,
+      paymentMethod: string,
+      notes: string,
+      status: string,
+      societyId: number,
+    ): void => {
+      mutate((s) => ({
+        ...s,
+        amcContracts: s.amcContracts.map((a) =>
+          a.id === id
+            ? {
+                id,
+                equipmentName,
+                vendor,
+                contactPerson,
+                contactPhone,
+                contractStart,
+                contractEnd,
+                amount,
+                paymentMethod,
+                notes,
+                status,
+                societyId,
+              }
+            : a,
+        ),
+      }));
+    },
+    deleteAmcContract: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        amcContracts: s.amcContracts.filter((a) => a.id !== id),
+      }));
+    },
 
     // Expose state for hooks to use directly if needed
     _nextId: nextId,

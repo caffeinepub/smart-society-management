@@ -6,9 +6,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  AlertCircle,
   BarChart3,
   Bell,
+  BookUser,
   Building2,
+  Car,
   ChevronDown,
   LayoutDashboard,
   LogOut,
@@ -17,7 +20,10 @@ import {
   Receipt,
   Settings,
   Shield,
+  TrendingDown,
+  TrendingUp,
   Users,
+  Wrench,
   X,
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
@@ -69,10 +75,52 @@ const navItems: NavItem[] = [
     roles: ["SuperAdmin", "Admin", "Staff"],
   },
   {
+    id: "expenses",
+    label: "Expenses",
+    icon: <TrendingDown className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin"],
+  },
+  {
     id: "analytics",
     label: "Analytics",
     icon: <BarChart3 className="w-4.5 h-4.5" />,
     roles: ["SuperAdmin", "Admin"],
+  },
+  {
+    id: "pnl",
+    label: "P&L Statement",
+    icon: <TrendingUp className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin"],
+  },
+  {
+    id: "directory",
+    label: "Directory",
+    icon: <BookUser className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin", "Resident", "Staff", "SecurityGuard"],
+  },
+  {
+    id: "vehicles",
+    label: "Vehicles",
+    icon: <Car className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin", "SecurityGuard", "Resident"],
+  },
+  {
+    id: "amc",
+    label: "AMC Tracker",
+    icon: <Wrench className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin"],
+  },
+  {
+    id: "notices",
+    label: "Notices",
+    icon: <Bell className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin", "Resident"],
+  },
+  {
+    id: "complaints",
+    label: "Complaints",
+    icon: <AlertCircle className="w-4.5 h-4.5" />,
+    roles: ["SuperAdmin", "Admin", "Resident", "SecurityGuard"],
   },
   {
     id: "settings",

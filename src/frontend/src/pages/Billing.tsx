@@ -172,14 +172,155 @@ function buildBillHTML(
   bill: Bill,
   societyInfo: SocietyInfo,
   unitInfo: PdfUnitInfo,
-  showAmountInWords: boolean,
+  isReceipt: boolean,
   billingDateOverride?: string,
+  paymentMethod?: string,
 ): string {
   const monthName = months[bill.month - 1] ?? "";
   const billNo = generateBillNumber(bill.id, bill.year);
   const billingDate = billingDateOverride ?? bill.dueDate;
   const areaDisplay = unitInfo.area ? `${unitInfo.area} Sq.Ft.` : "—";
 
+  if (isReceipt) {
+    // ── RECEIPT FORMAT (matches physical receipt sample) ──────────────────────
+    const isPaid = bill.status === "Paid";
+
+    // Map bill breakdown to the 12 receipt rows in the sample order
+    const receiptRows = [
+      { label: "Entrance Fees", value: 0 },
+      { label: "Shares", value: 0 },
+      { label: "Maintenance Dues", value: bill.breakdown.serviceCharges },
+      { label: "Interest", value: bill.breakdown.interest ?? 0 },
+      { label: "Municipal Taxes", value: bill.breakdown.houseTax ?? 0 },
+      { label: "Water Charges", value: bill.breakdown.nonOccupancyCharges },
+      { label: "Parking Charges", value: bill.breakdown.parkingCharges },
+      { label: "Sinking Fund", value: bill.breakdown.sinkingFund },
+      { label: "Service Charges", value: bill.breakdown.liftMaintenance },
+      { label: "Insurance", value: bill.breakdown.repairMaintenance ?? 0 },
+      { label: "Transfer Fees", value: 0 },
+      { label: "Miscellaneous", value: bill.breakdown.otherCharges },
+    ];
+
+    const receiptRowsHTML = receiptRows
+      .map(
+        (row, i) =>
+          `<tr>
+            <td class="sr">${i + 1}.</td>
+            <td class="particular">${row.label}</td>
+            <td class="amount-rs">${row.value > 0 ? row.value.toLocaleString("en-IN") : ""}</td>
+            <td class="amount-p"></td>
+          </tr>`,
+      )
+      .join("");
+
+    const pmDisplay = paymentMethod ?? (isPaid ? "Bank Transfer" : "");
+    const isCheque = pmDisplay.toLowerCase().includes("cheque");
+    const paymentLineHTML = `
+      <div class="payment-line">
+        <span>${numberToWords(bill.grandTotal)}</span>
+      </div>
+      <div class="payment-method-line">
+        in Cash&nbsp;/&nbsp;By Cheque No <span class="underline-blank">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        drawn at (Bank/Branch) <span class="underline-blank">&nbsp;${isCheque ? pmDisplay : pmDisplay}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;</span>
+        &nbsp;&nbsp;&nbsp;&nbsp; dated <span class="underline-blank">&nbsp;${billingDate}&nbsp;</span>
+      </div>`;
+
+    const statusClass = isPaid ? "status-paid" : "status-unpaid";
+    const statusText = isPaid ? "PAID" : "UNPAID";
+
+    return `<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8"/>
+<title>Receipt – ${bill.unitNumber} – ${monthName} ${bill.year}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 24px 32px; background: #fff; max-width: 680px; margin: 0 auto; }
+  .top-row { display: block; margin-bottom: 4px; }
+  .sr-date-row { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; }
+  .receipt-label { font-size: 20px; font-weight: 900; letter-spacing: 3px; text-align: center; width: 100%; display: block; margin-bottom: 6px; }
+  .sr-date { font-size: 12px; }
+  .srno { font-size: 13px; font-weight: 900; }
+  .society-name { font-size: 17px; font-weight: 900; text-transform: uppercase; color: #cc0000; letter-spacing: 0.5px; margin-top: 2px; text-align: center; font-style: normal; }
+  .society-sub { font-size: 10.5px; font-weight: 700; color: #111; margin-top: 1px; text-align: center; }
+  .society-address { font-size: 10.5px; font-weight: 700; color: #111; margin-top: 1px; text-align: center; }
+  .system-note { font-size: 10px; margin-top: 10px; text-align: center; font-style: italic; border-top: 1px solid #bbb; padding-top: 6px; }
+  .divider { border: none; border-top: 1px solid #555; margin: 8px 0 4px; }
+  .received-line { font-size: 12px; margin-bottom: 3px; }
+  .flat-line { font-size: 12px; margin-bottom: 6px; }
+  table.breakdown { width: 100%; border-collapse: collapse; margin-top: 2px; border: 1px solid #333; }
+  table.breakdown th { border: 1px solid #333; padding: 4px 6px; text-align: left; font-size: 11px; font-weight: 700; background: #f5f5f5; }
+  table.breakdown th.amount-rs, table.breakdown td.amount-rs { text-align: right; width: 70px; }
+  table.breakdown th.amount-p, table.breakdown td.amount-p { text-align: right; width: 40px; }
+  table.breakdown td { border: 1px solid #aaa; padding: 3px 6px; font-size: 12px; }
+  td.sr { width: 30px; border-right: 1px solid #aaa; }
+  td.particular { }
+  .total-row td { border-top: 2px solid #333; font-weight: 700; font-size: 12px; background: #f9f9f9; }
+  /* eoe-note removed */
+  .words-section { margin-top: 8px; font-size: 12px; }
+  .words-label { font-weight: 600; }
+  .payment-line { margin-top: 4px; font-size: 11px; font-style: italic; }
+  .payment-method-line { margin-top: 3px; font-size: 11px; }
+  .underline-blank { border-bottom: 1px solid #333; display: inline-block; min-width: 60px; }
+  .status-badge { display: inline-block; margin-top: 6px; padding: 2px 12px; font-size: 12px; font-weight: 800; letter-spacing: 2px; border-radius: 3px; text-transform: uppercase; }
+  .status-paid { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+  .status-unpaid { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+  .nb-note { font-size: 10px; margin-top: 10px; border-top: 1px solid #bbb; padding-top: 6px; }
+  .signatory { margin-top: 20px; text-align: right; font-size: 11px; font-weight: 600; }
+</style>
+</head>
+<body>
+  <div class="receipt-label">RECEIPT</div>
+  <div class="sr-date-row">
+    <span class="srno">Sr. No. : ${billNo}</span>
+    <span class="sr-date">Date : ${billingDate}</span>
+  </div>
+
+  <div class="society-name">${societyInfo.name || "SOCIETY NAME"}</div>
+  ${societyInfo.registrationNumber ? `<div class="society-sub">${societyInfo.registrationNumber}</div>` : ""}
+  <div class="society-address">${societyInfo.address}${societyInfo.city ? `, ${societyInfo.city}` : ""}</div>
+
+  <hr class="divider"/>
+
+  <div class="received-line">Received from Shri/Shrimati/M/s. <strong>${unitInfo.ownerName}</strong></div>
+  <div class="flat-line">Flat/Shop/ No. <strong>${bill.unitNumber}</strong> in <strong>${societyInfo.name || "HSG. SOC. LTD."}</strong>. On account of the particulars as stated below.</div>
+
+  <table class="breakdown">
+    <thead>
+      <tr>
+        <th class="sr" colspan="2">P a r t i c u l a r s</th>
+        <th colspan="2" style="text-align:center; vertical-align:middle;">
+          <div style="text-align:center; font-weight:700; letter-spacing:1px;">AMOUNT</div>
+          <div style="display:flex;justify-content:flex-end;gap:20px; margin-top:2px;"><span>Rs.</span><span style="margin-right:4px">P.</span></div>
+        </th>
+      </tr>
+    </thead>
+    <tbody>
+      ${receiptRowsHTML}
+      <tr class="total-row">
+        <td class="sr"></td>
+        <td class="particular" style="font-weight:700">TOTAL</td>
+        <td class="amount-rs" style="font-weight:700">${bill.grandTotal.toLocaleString("en-IN")}</td>
+        <td class="amount-p"></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="words-section">
+    <span class="words-label">Rupees (in words) </span>
+    ${paymentLineHTML}
+  </div>
+
+  <div class="status-badge ${statusClass}">${statusText}</div>
+
+  <div class="nb-note">N.B. 1. Receipts is valid subject to realisation of the cheque.</div>
+  <div class="signatory">Chairman/Secretary/Treasure/Authorised Signatory</div>
+  <div class="system-note">This is a system generated receipt, no signature required.</div>
+</body>
+</html>`;
+  }
+
+  // ── MAINTENANCE BILL FORMAT ──────────────────────────────────────────────────
   const breakdownRows = [
     { label: "Service Charges", value: bill.breakdown.serviceCharges },
     {
@@ -209,14 +350,10 @@ function buildBillHTML(
     )
     .join("");
 
-  const amountInWordsHTML = showAmountInWords
-    ? `<tr>
-        <td colspan="3" class="words-row">
-          <span class="words-label">Amount in Words:</span>
-          <span class="words-value">${numberToWords(bill.grandTotal)}</span>
-        </td>
-      </tr>`
-    : "";
+  const noteHTML = `<div class="note">
+    Note : This is a system generated bill, does not require signature.<br/>
+    Bill to be paid by 20th of every month.
+  </div>`;
 
   return `<!DOCTYPE html>
 <html>
@@ -226,10 +363,10 @@ function buildBillHTML(
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body { font-family: Arial, sans-serif; font-size: 12px; color: #111; padding: 28px 36px; background: #fff; max-width: 720px; margin: 0 auto; }
-  .doc-header { font-size: 14px; font-weight: 700; text-align: center; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; color: #1a56db; border-bottom: 2px solid #1a56db; padding-bottom: 4px; }
-  .society-name { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: #1a56db; }
-  .society-reg { font-size: 11px; margin-top: 2px; }
-  .society-address { font-size: 11px; margin-top: 1px; }
+  .doc-header { font-size: 14px; font-weight: 700; text-align: center; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 8px; color: #111; border-bottom: 2px solid #111; padding-bottom: 4px; }
+  .society-name { font-size: 16px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; color: #000; text-align: center; }
+  .society-reg { font-size: 11px; margin-top: 2px; font-weight: 700; text-align: center; }
+  .society-address { font-size: 11px; margin-top: 1px; font-weight: 700; text-align: center; }
   .divider { border: none; border-top: 1px dashed #888; margin: 10px 0; }
   .info-table { width: 100%; border-collapse: collapse; margin-bottom: 0; }
   .info-table td { padding: 3px 0; font-size: 12px; vertical-align: top; }
@@ -241,21 +378,17 @@ function buildBillHTML(
   table.breakdown th.amount, table.breakdown td.amount { text-align: right; }
   table.breakdown td { padding: 4px 8px; font-size: 12px; border: none; }
   td.sr { width: 40px; }
-  td.particular { }
   td.amount { width: 100px; text-align: right; }
   .total-row td { padding-top: 5px; }
   .prevdue-row td { padding-top: 2px; }
   .grandtotal-divider td { border-top: 1px dashed #888; padding-top: 2px; }
   .grandtotal-row td { font-weight: 700; font-size: 13px; padding-top: 4px; }
-  .words-row { padding-top: 6px; font-size: 11px; }
-  .words-label { font-weight: 600; }
-  .words-value { font-style: italic; margin-left: 4px; }
   .note { font-size: 11px; margin-top: 12px; border-top: 1px dashed #888; padding-top: 8px; }
   .signatory { margin-top: 24px; text-align: right; font-size: 12px; font-weight: 600; }
 </style>
 </head>
 <body>
-  <div class="doc-header">${showAmountInWords ? "Receipt" : "Maintenance Bill"}</div>
+  <div class="doc-header">Maintenance Bill</div>
   <div class="society-name">${societyInfo.name}</div>
   <div class="society-reg">${societyInfo.registrationNumber}</div>
   <div class="society-address">${societyInfo.address}${societyInfo.city ? `, ${societyInfo.city}` : ""}</div>
@@ -306,14 +439,10 @@ function buildBillHTML(
         <td colspan="2">Grand Total</td>
         <td class="amount">${bill.grandTotal.toLocaleString("en-IN")}</td>
       </tr>
-      ${amountInWordsHTML}
     </tbody>
   </table>
 
-  <div class="note">
-    Note : This is a system generated bill, does not require signature.<br/>
-    Bill to be paid by 20th of every month.
-  </div>
+  ${noteHTML}
   <div class="signatory">Chairman / Secretary / Treasurer</div>
 </body>
 </html>`;
@@ -354,7 +483,33 @@ function printReceiptPDF(
   const monthName = months[bill.month - 1] ?? "";
   const billNo = generateBillNumber(bill.id, bill.year);
   const paymentDate = formatDate(payment.paidAt);
-  const html = buildBillHTML(bill, societyInfo, unitInfo, true, paymentDate);
+  const html = buildBillHTML(
+    bill,
+    societyInfo,
+    unitInfo,
+    true,
+    paymentDate,
+    payment.paymentMethod,
+  );
+  const filename = `Receipt_${billNo}_${bill.unitNumber}_${monthName}${bill.year}.html`;
+  downloadHTMLasPDF(html, filename);
+}
+
+function printUnpaidReceiptPDF(
+  bill: Bill,
+  societyInfo: SocietyInfo,
+  unitInfo: PdfUnitInfo,
+) {
+  const monthName = months[bill.month - 1] ?? "";
+  const billNo = generateBillNumber(bill.id, bill.year);
+  const html = buildBillHTML(
+    bill,
+    societyInfo,
+    unitInfo,
+    true,
+    undefined,
+    undefined,
+  );
   const filename = `Receipt_${billNo}_${bill.unitNumber}_${monthName}${bill.year}.html`;
   downloadHTMLasPDF(html, filename);
 }
@@ -1141,28 +1296,37 @@ function ResidentBillingView() {
                               <Download className="w-3.5 h-3.5" />
                               Bill
                             </Button>
-                            {/* Download Receipt — only for paid bills */}
-                            {isPaid && payment && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-xs font-body h-7 gap-1.5"
-                                style={{ color: "oklch(0.45 0.18 155)" }}
-                                onClick={() => {
-                                  const u = allUnits.find(
-                                    (u) => u.unitNumber === bill.unitNumber,
-                                  );
+                            {/* Download Receipt — always available, shows PAID or UNPAID */}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-xs font-body h-7 gap-1.5"
+                              style={{
+                                color: isPaid
+                                  ? "oklch(0.45 0.18 155)"
+                                  : "oklch(0.52 0.18 243)",
+                              }}
+                              onClick={() => {
+                                const u = allUnits.find(
+                                  (u) => u.unitNumber === bill.unitNumber,
+                                );
+                                if (isPaid && payment) {
                                   printReceiptPDF(bill, payment, societyInfo, {
                                     ownerName: u?.ownerName ?? bill.unitNumber,
                                     area: u?.area,
                                   });
-                                }}
-                                title="Download Receipt PDF"
-                              >
-                                <FileCheck className="w-3.5 h-3.5" />
-                                Receipt
-                              </Button>
-                            )}
+                                } else {
+                                  printUnpaidReceiptPDF(bill, societyInfo, {
+                                    ownerName: u?.ownerName ?? bill.unitNumber,
+                                    area: u?.area,
+                                  });
+                                }
+                              }}
+                              title="Download Receipt PDF"
+                            >
+                              <FileCheck className="w-3.5 h-3.5" />
+                              Receipt
+                            </Button>
                           </div>
                         </TableCell>
                       </TableRow>
