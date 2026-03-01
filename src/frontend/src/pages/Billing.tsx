@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Separator } from "@/components/ui/separator";
 import {
   Table,
   TableBody,
@@ -89,13 +90,32 @@ export default function Billing({ role }: BillingProps) {
   const [generateOpen, setGenerateOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
-  // Generate bill form
+  // Generate bill form — unit selector
   const [billUnitId, setBillUnitId] = useState("");
   const [billUnitNumber, setBillUnitNumber] = useState("");
-  const [billAmount, setBillAmount] = useState("");
-  const [billDueDate, setBillDueDate] = useState("");
   const [billMonth, setBillMonth] = useState("");
   const [billYear, setBillYear] = useState(new Date().getFullYear().toString());
+  const [billDueDate, setBillDueDate] = useState("");
+
+  // Breakdown fields
+  const [baseMaintenance, setBaseMaintenance] = useState("");
+  const [waterCharges, setWaterCharges] = useState("");
+  const [liftMaintenance, setLiftMaintenance] = useState("");
+  const [parkingCharges, setParkingCharges] = useState("");
+  const [sinkingFund, setSinkingFund] = useState("");
+  const [otherCharges, setOtherCharges] = useState("");
+  const [previousDue, setPreviousDue] = useState("0");
+
+  // Reactive totals
+  const totalMaintenance = [
+    baseMaintenance,
+    waterCharges,
+    liftMaintenance,
+    parkingCharges,
+    sinkingFund,
+    otherCharges,
+  ].reduce((sum, v) => sum + (Number(v) || 0), 0);
+  const grandTotal = totalMaintenance + (Number(previousDue) || 0);
 
   // Record payment form
   const [payBillId, setPayBillId] = useState("");
@@ -106,24 +126,48 @@ export default function Billing({ role }: BillingProps) {
   const units = store.getUnits();
   const financialSummary = store.getFinancialSummary();
 
+  const resetGenerateForm = () => {
+    setBillUnitId("");
+    setBillUnitNumber("");
+    setBillMonth("");
+    setBillDueDate("");
+    setBaseMaintenance("");
+    setWaterCharges("");
+    setLiftMaintenance("");
+    setParkingCharges("");
+    setSinkingFund("");
+    setOtherCharges("");
+    setPreviousDue("0");
+  };
+
   const handleCreateBill = () => {
-    if (!billUnitId || !billMonth || !billYear || !billAmount || !billDueDate)
+    if (
+      !billUnitId ||
+      !billMonth ||
+      !billYear ||
+      !billDueDate ||
+      totalMaintenance === 0
+    )
       return;
     store.createBill(
       Number(billUnitId),
       billUnitNumber,
-      Number(billAmount),
+      {
+        baseMaintenance: Number(baseMaintenance) || 0,
+        waterCharges: Number(waterCharges) || 0,
+        liftMaintenance: Number(liftMaintenance) || 0,
+        parkingCharges: Number(parkingCharges) || 0,
+        sinkingFund: Number(sinkingFund) || 0,
+        otherCharges: Number(otherCharges) || 0,
+      },
+      Number(previousDue) || 0,
       billDueDate,
       Number(billMonth),
       Number(billYear),
     );
     toast.success("Bill generated successfully");
     setGenerateOpen(false);
-    setBillUnitId("");
-    setBillUnitNumber("");
-    setBillAmount("");
-    setBillDueDate("");
-    setBillMonth("");
+    resetGenerateForm();
     refresh();
   };
 
@@ -145,10 +189,10 @@ export default function Billing({ role }: BillingProps) {
     );
     return {
       month: m.slice(0, 3),
-      billed: monthBills.reduce((sum, b) => sum + b.amount, 0),
+      billed: monthBills.reduce((sum, b) => sum + b.grandTotal, 0),
       collected: monthBills
         .filter((b) => b.status === "Paid")
-        .reduce((sum, b) => sum + b.amount, 0),
+        .reduce((sum, b) => sum + b.grandTotal, 0),
     };
   });
 
@@ -173,19 +217,26 @@ export default function Billing({ role }: BillingProps) {
         <TabsContent value="bills" className="mt-0">
           <div className="flex justify-end mb-4 gap-2">
             {isAdmin && (
-              <Dialog open={generateOpen} onOpenChange={setGenerateOpen}>
+              <Dialog
+                open={generateOpen}
+                onOpenChange={(v) => {
+                  setGenerateOpen(v);
+                  if (!v) resetGenerateForm();
+                }}
+              >
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-2 font-body">
                     <Plus className="w-4 h-4" /> Generate Bill
                   </Button>
                 </DialogTrigger>
-                <DialogContent>
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle className="font-display">
                       Generate Maintenance Bill
                     </DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4 pt-2">
+                    {/* Unit selector */}
                     <div className="space-y-1.5">
                       <Label className="font-body">Unit</Label>
                       <Select
@@ -195,7 +246,12 @@ export default function Billing({ role }: BillingProps) {
                           const u = units.find((u) => u.id.toString() === val);
                           if (u) {
                             setBillUnitNumber(u.unitNumber);
-                            setBillAmount(u.monthlyMaintenance.toString());
+                            setBaseMaintenance(u.monthlyMaintenance.toString());
+                            setWaterCharges("0");
+                            setLiftMaintenance("0");
+                            setParkingCharges("0");
+                            setSinkingFund("0");
+                            setOtherCharges("0");
                           }
                         }}
                       >
@@ -215,6 +271,8 @@ export default function Billing({ role }: BillingProps) {
                         </SelectContent>
                       </Select>
                     </div>
+
+                    {/* Month / Year */}
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <Label className="font-body">Month</Label>
@@ -245,27 +303,156 @@ export default function Billing({ role }: BillingProps) {
                         />
                       </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label className="font-body">Amount (₹)</Label>
-                        <Input
-                          type="number"
-                          value={billAmount}
-                          onChange={(e) => setBillAmount(e.target.value)}
-                          placeholder="Amount"
-                          className="font-body"
-                        />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label className="font-body">Due Date</Label>
-                        <Input
-                          type="date"
-                          value={billDueDate}
-                          onChange={(e) => setBillDueDate(e.target.value)}
-                          className="font-body"
-                        />
+
+                    {/* Due Date */}
+                    <div className="space-y-1.5">
+                      <Label className="font-body">Due Date</Label>
+                      <Input
+                        type="date"
+                        value={billDueDate}
+                        onChange={(e) => setBillDueDate(e.target.value)}
+                        className="font-body"
+                      />
+                    </div>
+
+                    <Separator />
+
+                    {/* Maintenance Breakdown */}
+                    <div>
+                      <p className="text-xs font-body font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+                        Maintenance Breakdown
+                      </p>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="font-body text-sm">
+                              Base Maintenance (₹)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={baseMaintenance}
+                              onChange={(e) =>
+                                setBaseMaintenance(e.target.value)
+                              }
+                              placeholder="0"
+                              className="font-body"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="font-body text-sm">
+                              Water Charges (₹)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={waterCharges}
+                              onChange={(e) => setWaterCharges(e.target.value)}
+                              placeholder="0"
+                              className="font-body"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="font-body text-sm">
+                              Lift Maintenance (₹)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={liftMaintenance}
+                              onChange={(e) =>
+                                setLiftMaintenance(e.target.value)
+                              }
+                              placeholder="0"
+                              className="font-body"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="font-body text-sm">
+                              Parking Charges (₹)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={parkingCharges}
+                              onChange={(e) =>
+                                setParkingCharges(e.target.value)
+                              }
+                              placeholder="0"
+                              className="font-body"
+                            />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div className="space-y-1.5">
+                            <Label className="font-body text-sm">
+                              Sinking Fund (₹)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={sinkingFund}
+                              onChange={(e) => setSinkingFund(e.target.value)}
+                              placeholder="0"
+                              className="font-body"
+                            />
+                          </div>
+                          <div className="space-y-1.5">
+                            <Label className="font-body text-sm">
+                              Other Charges (₹)
+                            </Label>
+                            <Input
+                              type="number"
+                              value={otherCharges}
+                              onChange={(e) => setOtherCharges(e.target.value)}
+                              placeholder="0"
+                              className="font-body"
+                            />
+                          </div>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Total maintenance read-only */}
+                    <div
+                      className="flex items-center justify-between px-3 py-2 rounded-lg"
+                      style={{ background: "oklch(0.94 0.008 240)" }}
+                    >
+                      <span className="text-sm font-body text-muted-foreground">
+                        Total Maintenance
+                      </span>
+                      <span className="font-body font-semibold">
+                        ₹{totalMaintenance.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+
+                    <Separator />
+
+                    {/* Previous Due */}
+                    <div className="space-y-1.5">
+                      <Label className="font-body">Previous Due (₹)</Label>
+                      <Input
+                        type="number"
+                        value={previousDue}
+                        onChange={(e) => setPreviousDue(e.target.value)}
+                        placeholder="0"
+                        className="font-body"
+                      />
+                    </div>
+
+                    {/* Grand Total read-only */}
+                    <div
+                      className="flex items-center justify-between px-3 py-2.5 rounded-lg"
+                      style={{ background: "oklch(0.92 0.06 240)" }}
+                    >
+                      <span className="text-sm font-body font-semibold">
+                        Grand Total
+                      </span>
+                      <span
+                        className="font-display font-bold text-lg"
+                        style={{ color: "oklch(0.35 0.15 243)" }}
+                      >
+                        ₹{grandTotal.toLocaleString("en-IN")}
+                      </span>
+                    </div>
+
                     <Button
                       className="w-full font-body"
                       onClick={handleCreateBill}
@@ -273,8 +460,8 @@ export default function Billing({ role }: BillingProps) {
                         !billUnitId ||
                         !billMonth ||
                         !billYear ||
-                        !billAmount ||
-                        !billDueDate
+                        !billDueDate ||
+                        totalMaintenance === 0
                       }
                     >
                       Generate Bill
@@ -297,7 +484,13 @@ export default function Billing({ role }: BillingProps) {
                       Month/Year
                     </TableHead>
                     <TableHead className="font-body font-semibold">
-                      Amount
+                      Amount (₹)
+                    </TableHead>
+                    <TableHead className="font-body font-semibold">
+                      Prev. Due (₹)
+                    </TableHead>
+                    <TableHead className="font-body font-semibold">
+                      Grand Total (₹)
                     </TableHead>
                     <TableHead className="font-body font-semibold">
                       Due Date
@@ -316,7 +509,7 @@ export default function Billing({ role }: BillingProps) {
                   {bills.length === 0 ? (
                     <TableRow>
                       <TableCell
-                        colSpan={isAdmin ? 6 : 5}
+                        colSpan={isAdmin ? 8 : 7}
                         className="text-center py-12 font-body text-muted-foreground"
                       >
                         No bills generated yet
@@ -333,6 +526,17 @@ export default function Billing({ role }: BillingProps) {
                         </TableCell>
                         <TableCell className="font-body font-medium">
                           ₹{bill.amount.toLocaleString("en-IN")}
+                        </TableCell>
+                        <TableCell className="font-body text-sm">
+                          {bill.previousDue > 0
+                            ? `₹${bill.previousDue.toLocaleString("en-IN")}`
+                            : "—"}
+                        </TableCell>
+                        <TableCell
+                          className="font-body font-semibold"
+                          style={{ color: "oklch(0.35 0.15 243)" }}
+                        >
+                          ₹{bill.grandTotal.toLocaleString("en-IN")}
                         </TableCell>
                         <TableCell className="font-body text-sm">
                           {bill.dueDate}
@@ -354,7 +558,7 @@ export default function Billing({ role }: BillingProps) {
                                 className="text-xs font-body h-7"
                                 onClick={() => {
                                   setPayBillId(bill.id.toString());
-                                  setPayAmount(bill.amount.toString());
+                                  setPayAmount(bill.grandTotal.toString());
                                   setPaymentOpen(true);
                                 }}
                               >
@@ -389,7 +593,7 @@ export default function Billing({ role }: BillingProps) {
                     onValueChange={(val) => {
                       setPayBillId(val);
                       const b = bills.find((b) => b.id.toString() === val);
-                      if (b) setPayAmount(b.amount.toString());
+                      if (b) setPayAmount(b.grandTotal.toString());
                     }}
                   >
                     <SelectTrigger className="font-body">
@@ -405,7 +609,7 @@ export default function Billing({ role }: BillingProps) {
                             className="font-body"
                           >
                             {b.unitNumber} — {months[b.month - 1]?.slice(0, 3)}{" "}
-                            {b.year} — ₹{b.amount.toLocaleString("en-IN")}
+                            {b.year} — ₹{b.grandTotal.toLocaleString("en-IN")}
                           </SelectItem>
                         ))}
                     </SelectContent>

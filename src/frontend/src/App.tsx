@@ -40,7 +40,7 @@ export default function App() {
       case "dashboard":
         return <Dashboard role={role} />;
       case "properties":
-        return <Properties />;
+        return <Properties role={role} />;
       case "billing":
         return <Billing role={role} />;
       case "security":

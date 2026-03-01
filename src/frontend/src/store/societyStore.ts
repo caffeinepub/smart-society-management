@@ -15,6 +15,15 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export interface Society {
+  id: number;
+  name: string;
+  address: string;
+  city: string;
+  registrationNumber: string;
+  contactPhone: string;
+}
+
 export interface SocietyInfo {
   name: string;
   address: string;
@@ -27,6 +36,7 @@ export interface Tower {
   id: number;
   name: string;
   totalFloors: number;
+  societyId: number; // which society this tower belongs to
 }
 
 export interface Unit {
@@ -39,11 +49,23 @@ export interface Unit {
   monthlyMaintenance: number;
 }
 
+export interface BillBreakdown {
+  baseMaintenance: number;
+  waterCharges: number;
+  liftMaintenance: number;
+  parkingCharges: number;
+  sinkingFund: number;
+  otherCharges: number;
+}
+
 export interface Bill {
   id: number;
   unitId: number;
   unitNumber: string;
-  amount: number;
+  amount: number; // sum of breakdown fields
+  previousDue: number; // carry-forward from previous month
+  grandTotal: number; // amount + previousDue
+  breakdown: BillBreakdown;
   dueDate: string;
   month: number;
   year: number;
@@ -145,6 +167,8 @@ export interface SalaryRecord {
 
 interface StoreState {
   societyInfo: SocietyInfo;
+  societies: Society[];
+  activeSocietyId: number;
   towers: Tower[];
   units: Unit[];
   bills: Bill[];
@@ -165,9 +189,9 @@ const CURRENT_YEAR = new Date().getFullYear();
 
 function buildSeedData(): StoreState {
   const towers: Tower[] = [
-    { id: 1, name: "Tower A", totalFloors: 12 },
-    { id: 2, name: "Tower B", totalFloors: 10 },
-    { id: 3, name: "Tower C", totalFloors: 8 },
+    { id: 1, name: "Tower A", totalFloors: 12, societyId: 1 },
+    { id: 2, name: "Tower B", totalFloors: 10, societyId: 1 },
+    { id: 3, name: "Tower C", totalFloors: 8, societyId: 1 },
   ];
 
   const units: Unit[] = [
@@ -287,6 +311,16 @@ function buildSeedData(): StoreState {
       unitId: 1,
       unitNumber: "A-101",
       amount: 3500,
+      previousDue: 0,
+      grandTotal: 3500,
+      breakdown: {
+        baseMaintenance: 2500,
+        waterCharges: 300,
+        liftMaintenance: 300,
+        parkingCharges: 200,
+        sinkingFund: 100,
+        otherCharges: 100,
+      },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
       year: CURRENT_YEAR,
@@ -297,6 +331,16 @@ function buildSeedData(): StoreState {
       unitId: 2,
       unitNumber: "A-203",
       amount: 3500,
+      previousDue: 0,
+      grandTotal: 3500,
+      breakdown: {
+        baseMaintenance: 2500,
+        waterCharges: 300,
+        liftMaintenance: 300,
+        parkingCharges: 200,
+        sinkingFund: 100,
+        otherCharges: 100,
+      },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
       year: CURRENT_YEAR,
@@ -307,6 +351,16 @@ function buildSeedData(): StoreState {
       unitId: 5,
       unitNumber: "B-102",
       amount: 3000,
+      previousDue: 0,
+      grandTotal: 3000,
+      breakdown: {
+        baseMaintenance: 2200,
+        waterCharges: 250,
+        liftMaintenance: 250,
+        parkingCharges: 150,
+        sinkingFund: 100,
+        otherCharges: 50,
+      },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
       year: CURRENT_YEAR,
@@ -317,6 +371,16 @@ function buildSeedData(): StoreState {
       unitId: 9,
       unitNumber: "C-102",
       amount: 2500,
+      previousDue: 0,
+      grandTotal: 2500,
+      breakdown: {
+        baseMaintenance: 1800,
+        waterCharges: 200,
+        liftMaintenance: 200,
+        parkingCharges: 150,
+        sinkingFund: 100,
+        otherCharges: 50,
+      },
       dueDate: `${CURRENT_YEAR}-02-10`,
       month: 1,
       year: CURRENT_YEAR,
@@ -327,6 +391,16 @@ function buildSeedData(): StoreState {
       unitId: 3,
       unitNumber: "A-301",
       amount: 4000,
+      previousDue: 0,
+      grandTotal: 4000,
+      breakdown: {
+        baseMaintenance: 2900,
+        waterCharges: 350,
+        liftMaintenance: 350,
+        parkingCharges: 200,
+        sinkingFund: 100,
+        otherCharges: 100,
+      },
       dueDate: `${CURRENT_YEAR}-03-10`,
       month: 2,
       year: CURRENT_YEAR,
@@ -337,6 +411,16 @@ function buildSeedData(): StoreState {
       unitId: 6,
       unitNumber: "B-203",
       amount: 3000,
+      previousDue: 500,
+      grandTotal: 3500,
+      breakdown: {
+        baseMaintenance: 2200,
+        waterCharges: 250,
+        liftMaintenance: 250,
+        parkingCharges: 150,
+        sinkingFund: 100,
+        otherCharges: 50,
+      },
       dueDate: `${CURRENT_YEAR}-03-10`,
       month: 2,
       year: CURRENT_YEAR,
@@ -347,6 +431,16 @@ function buildSeedData(): StoreState {
       unitId: 10,
       unitNumber: "C-105",
       amount: 2500,
+      previousDue: 2500,
+      grandTotal: 5000,
+      breakdown: {
+        baseMaintenance: 1800,
+        waterCharges: 200,
+        liftMaintenance: 200,
+        parkingCharges: 150,
+        sinkingFund: 100,
+        otherCharges: 50,
+      },
       dueDate: `${CURRENT_YEAR}-01-10`,
       month: 12,
       year: CURRENT_YEAR - 1,
@@ -357,6 +451,16 @@ function buildSeedData(): StoreState {
       unitId: 8,
       unitNumber: "B-401",
       amount: 4500,
+      previousDue: 0,
+      grandTotal: 4500,
+      breakdown: {
+        baseMaintenance: 3300,
+        waterCharges: 400,
+        liftMaintenance: 400,
+        parkingCharges: 200,
+        sinkingFund: 100,
+        otherCharges: 100,
+      },
       dueDate: `${CURRENT_YEAR}-03-10`,
       month: 2,
       year: CURRENT_YEAR,
@@ -642,7 +746,7 @@ function buildSeedData(): StoreState {
   const today = new Date();
   const attendance: Attendance[] = [];
   let attendanceId = 1;
-  for (let staffMember of staff) {
+  for (const staffMember of staff) {
     // Past 7 days of attendance
     for (let d = 6; d >= 1; d--) {
       const date = new Date(today);
@@ -742,6 +846,17 @@ function buildSeedData(): StoreState {
     },
   ];
 
+  const societies: Society[] = [
+    {
+      id: 1,
+      name: "Prestige Lakeside Habitat",
+      address: "14, Whitefield Main Road",
+      city: "Bengaluru",
+      registrationNumber: "CHS/KA/2021/004512",
+      contactPhone: "+91 98765 43210",
+    },
+  ];
+
   return {
     societyInfo: {
       name: "Prestige Lakeside Habitat",
@@ -750,6 +865,8 @@ function buildSeedData(): StoreState {
       registrationNumber: "CHS/KA/2021/004512",
       contactPhone: "+91 98765 43210",
     },
+    societies,
+    activeSocietyId: 1,
     towers,
     units,
     bills,
@@ -773,7 +890,45 @@ function loadFromStorage(): StoreState {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
-      return JSON.parse(raw) as StoreState;
+      const parsed = JSON.parse(raw) as StoreState;
+      // Migrate: ensure societies and activeSocietyId exist for older saves
+      if (!parsed.societies) {
+        parsed.societies = [
+          {
+            id: 1,
+            name: parsed.societyInfo.name,
+            address: parsed.societyInfo.address,
+            city: parsed.societyInfo.city,
+            registrationNumber: parsed.societyInfo.registrationNumber,
+            contactPhone: parsed.societyInfo.contactPhone,
+          },
+        ];
+        parsed.activeSocietyId = 1;
+      }
+      // Migrate towers: ensure societyId exists
+      if (parsed.towers) {
+        parsed.towers = parsed.towers.map((t) => ({
+          ...t,
+          societyId: t.societyId ?? (parsed.activeSocietyId || 1),
+        }));
+      }
+      // Migrate bills: ensure breakdown/previousDue/grandTotal exist
+      if (parsed.bills) {
+        parsed.bills = parsed.bills.map((b) => ({
+          ...b,
+          previousDue: b.previousDue ?? 0,
+          grandTotal: b.grandTotal ?? b.amount,
+          breakdown: b.breakdown ?? {
+            baseMaintenance: b.amount,
+            waterCharges: 0,
+            liftMaintenance: 0,
+            parkingCharges: 0,
+            sinkingFund: 0,
+            otherCharges: 0,
+          },
+        }));
+      }
+      return parsed;
     }
   } catch {
     // ignore parse errors
@@ -816,25 +971,121 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       mutate((s) => ({
         ...s,
         societyInfo: { name, address, city, registrationNumber, contactPhone },
+        societies: s.societies.map((soc) =>
+          soc.id === s.activeSocietyId
+            ? { ...soc, name, address, city, registrationNumber, contactPhone }
+            : soc,
+        ),
       }));
     },
 
-    // Towers
-    getTowers: (): Tower[] => state.towers,
-    createTower: (name: string, totalFloors: number): number => {
+    // Societies
+    getSocieties: (): Society[] => state.societies,
+    getActiveSocietyId: (): number => state.activeSocietyId,
+    registerSociety: (
+      name: string,
+      address: string,
+      city: string,
+      registrationNumber: string,
+      contactPhone: string,
+    ): number => {
       const id = state.nextId;
       mutate((s) => ({
         ...s,
-        towers: [...s.towers, { id, name, totalFloors }],
+        societies: [
+          ...s.societies,
+          { id, name, address, city, registrationNumber, contactPhone },
+        ],
         nextId: s.nextId + 1,
       }));
       return id;
     },
-    updateTower: (id: number, name: string, totalFloors: number): void => {
+    setActiveSociety: (id: number): void => {
+      mutate((s) => {
+        const soc = s.societies.find((x) => x.id === id);
+        if (!soc) return s;
+        return {
+          ...s,
+          activeSocietyId: id,
+          societyInfo: {
+            name: soc.name,
+            address: soc.address,
+            city: soc.city,
+            registrationNumber: soc.registrationNumber,
+            contactPhone: soc.contactPhone,
+          },
+        };
+      });
+    },
+    updateActiveSociety: (
+      name: string,
+      address: string,
+      city: string,
+      registrationNumber: string,
+      contactPhone: string,
+    ): void => {
+      mutate((s) => ({
+        ...s,
+        societyInfo: { name, address, city, registrationNumber, contactPhone },
+        societies: s.societies.map((soc) =>
+          soc.id === s.activeSocietyId
+            ? { ...soc, name, address, city, registrationNumber, contactPhone }
+            : soc,
+        ),
+      }));
+    },
+    updateSociety: (
+      id: number,
+      name: string,
+      address: string,
+      city: string,
+      registrationNumber: string,
+      contactPhone: string,
+    ): void => {
+      mutate((s) => {
+        const updatedSocieties = s.societies.map((soc) =>
+          soc.id === id
+            ? { ...soc, name, address, city, registrationNumber, contactPhone }
+            : soc,
+        );
+        // Also update societyInfo if editing the active society
+        const newSocietyInfo =
+          id === s.activeSocietyId
+            ? { name, address, city, registrationNumber, contactPhone }
+            : s.societyInfo;
+        return {
+          ...s,
+          societies: updatedSocieties,
+          societyInfo: newSocietyInfo,
+        };
+      });
+    },
+
+    // Towers
+    getTowers: (): Tower[] => state.towers,
+    createTower: (
+      name: string,
+      totalFloors: number,
+      societyId: number,
+    ): number => {
+      const id = state.nextId;
+      mutate((s) => ({
+        ...s,
+        towers: [...s.towers, { id, name, totalFloors, societyId }],
+        nextId: s.nextId + 1,
+      }));
+      return id;
+    },
+    updateTower: (
+      id: number,
+      name: string,
+      totalFloors: number,
+      societyId: number,
+    ): void => {
       mutate((s) => ({
         ...s,
         towers: s.towers.map((t) =>
-          t.id === id ? { id, name, totalFloors } : t,
+          t.id === id ? { id, name, totalFloors, societyId } : t,
         ),
       }));
     },
@@ -906,12 +1157,21 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
     createBill: (
       unitId: number,
       unitNumber: string,
-      amount: number,
+      breakdown: BillBreakdown,
+      previousDue: number,
       dueDate: string,
       month: number,
       year: number,
     ): number => {
       const id = state.nextId;
+      const amount =
+        breakdown.baseMaintenance +
+        breakdown.waterCharges +
+        breakdown.liftMaintenance +
+        breakdown.parkingCharges +
+        breakdown.sinkingFund +
+        breakdown.otherCharges;
+      const grandTotal = amount + previousDue;
       mutate((s) => ({
         ...s,
         bills: [
@@ -921,6 +1181,9 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             unitId,
             unitNumber,
             amount,
+            previousDue,
+            grandTotal,
+            breakdown,
             dueDate,
             month,
             year,
@@ -956,10 +1219,10 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       }));
     },
     getFinancialSummary: (): FinancialSummary => {
-      const totalBilled = state.bills.reduce((sum, b) => sum + b.amount, 0);
+      const totalBilled = state.bills.reduce((sum, b) => sum + b.grandTotal, 0);
       const totalCollected = state.bills
         .filter((b) => b.status === "Paid")
-        .reduce((sum, b) => sum + b.amount, 0);
+        .reduce((sum, b) => sum + b.grandTotal, 0);
       return {
         totalBilled,
         totalCollected,
