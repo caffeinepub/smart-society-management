@@ -49,7 +49,8 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import type { Expense } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
@@ -112,11 +113,17 @@ interface ExpenseDialogProps {
   open: boolean;
   editingExpense: Expense | null;
   onClose: () => void;
+  societyId?: number | null;
 }
 
-function ExpenseDialog({ open, editingExpense, onClose }: ExpenseDialogProps) {
+function ExpenseDialog({
+  open,
+  editingExpense,
+  onClose,
+  societyId: propSocietyId,
+}: ExpenseDialogProps) {
   const store = useSocietyStore();
-  const societyId = store.getActiveSocietyId();
+  const societyId = propSocietyId ?? store.getActiveSocietyId();
 
   const [form, setFormState] = useState<ExpenseFormData>(() =>
     editingExpense
@@ -336,9 +343,10 @@ function ExpenseDialog({ open, editingExpense, onClose }: ExpenseDialogProps) {
 
 interface ExpensesProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function Expenses({ role }: ExpensesProps) {
+export default function Expenses({ role, societyId }: ExpensesProps) {
   const store = useSocietyStore();
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
@@ -349,7 +357,12 @@ export default function Expenses({ role }: ExpensesProps) {
   const [filterMethod, setFilterMethod] = useState("All");
   const [search, setSearch] = useState("");
 
-  const canEdit = role === "SuperAdmin" || role === "Admin";
+  const canEdit =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   if (!canEdit) {
     return (
@@ -370,7 +383,7 @@ export default function Expenses({ role }: ExpensesProps) {
     );
   }
 
-  const allExpenses = store.getExpenses();
+  const allExpenses = store.getExpenses(societyId);
 
   // Filter
   const filtered = allExpenses.filter((e) => {
@@ -431,14 +444,28 @@ export default function Expenses({ role }: ExpensesProps) {
             Record and track all society expenditures
           </p>
         </div>
-        <Button
-          className="gap-2 font-body"
-          style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
-          onClick={openAdd}
-        >
-          <Plus className="w-4 h-4" />
-          Add Expense
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {allExpenses.length > 0 && (
+            <DeleteAllDialog
+              label="Delete All Expenses"
+              description="Are you sure you want to delete all expense records? This action cannot be undone."
+              onConfirm={() => {
+                store.deleteAllExpenses(societyId);
+                toast.success("All expenses deleted");
+                refresh();
+              }}
+              ocidScope="expenses"
+            />
+          )}
+          <Button
+            className="gap-2 font-body"
+            style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
+            onClick={openAdd}
+          >
+            <Plus className="w-4 h-4" />
+            Add Expense
+          </Button>
+        </div>
       </div>
 
       {/* Summary KPIs */}
@@ -794,6 +821,7 @@ export default function Expenses({ role }: ExpensesProps) {
           setEditingExpense(null);
           refresh();
         }}
+        societyId={societyId}
       />
     </div>
   );

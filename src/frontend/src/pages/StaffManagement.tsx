@@ -39,7 +39,8 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
 const staffRoles = [
@@ -70,14 +71,23 @@ const months = [
 
 interface StaffManagementProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function StaffManagement({ role }: StaffManagementProps) {
+export default function StaffManagement({
+  role,
+  societyId,
+}: StaffManagementProps) {
   const store = useSocietyStore();
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
 
-  const isAdmin = role === "SuperAdmin" || role === "Admin";
+  const isAdmin =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   // Add staff form
   const [staffOpen, setStaffOpen] = useState(false);
@@ -107,9 +117,14 @@ export default function StaffManagement({ role }: StaffManagementProps) {
     new Date().toISOString().slice(0, 10),
   );
 
-  const staffList = store.getStaff();
-  const attendance = store.getAttendance();
-  const salaryRecords = store.getSalaryRecords();
+  const allStaffList = store.getStaff(societyId);
+  const staffList = allStaffList;
+  const allAttendance = store.getAttendance();
+  const allSalaryRecords = store.getSalaryRecords();
+  // Filter attendance and salary records to only staff in this society
+  const staffIds = new Set(staffList.map((s) => s.id));
+  const attendance = allAttendance.filter((a) => staffIds.has(a.staffId));
+  const salaryRecords = allSalaryRecords.filter((r) => staffIds.has(r.staffId));
 
   const handleAddStaff = () => {
     if (!staffName || !staffPhone || !staffSalary) return;
@@ -119,6 +134,7 @@ export default function StaffManagement({ role }: StaffManagementProps) {
       staffPhone,
       Number(staffSalary),
       joiningDate,
+      societyId ?? undefined,
     );
     toast.success("Staff member added");
     setStaffOpen(false);
@@ -178,7 +194,22 @@ export default function StaffManagement({ role }: StaffManagementProps) {
 
         {/* Directory */}
         <TabsContent value="directory" className="mt-0">
-          <div className="flex justify-end mb-4">
+          <div className="flex justify-end mb-4 gap-2 flex-wrap">
+            {isAdmin && staffList.length > 0 && (
+              <DeleteAllDialog
+                label="Delete All Staff"
+                description="Are you sure you want to delete all staff members? This will also remove all attendance and salary records for them. This action cannot be undone."
+                onConfirm={() => {
+                  const ids = new Set(staffList.map((s) => s.id));
+                  store.deleteAllAttendance(ids);
+                  store.deleteAllSalaryRecords(ids);
+                  store.deleteAllStaff(societyId);
+                  toast.success("All staff records deleted");
+                  refresh();
+                }}
+                ocidScope="staff"
+              />
+            )}
             {isAdmin && (
               <Dialog open={staffOpen} onOpenChange={setStaffOpen}>
                 <DialogTrigger asChild>
@@ -483,7 +514,19 @@ export default function StaffManagement({ role }: StaffManagementProps) {
         {/* Salary */}
         {isAdmin && (
           <TabsContent value="salary" className="mt-0">
-            <div className="flex justify-end mb-4">
+            <div className="flex justify-end mb-4 gap-2 flex-wrap">
+              {salaryRecords.length > 0 && (
+                <DeleteAllDialog
+                  label="Delete All Salary Records"
+                  description="Are you sure you want to delete all salary records? This action cannot be undone."
+                  onConfirm={() => {
+                    store.deleteAllSalaryRecords();
+                    toast.success("All salary records deleted");
+                    refresh();
+                  }}
+                  ocidScope="salary"
+                />
+              )}
               <Dialog open={salaryOpen} onOpenChange={setSalaryOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-2 font-body">

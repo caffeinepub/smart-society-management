@@ -31,7 +31,7 @@ import { Building2, Edit2, Home, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import type { AppRole } from "../store/societyStore";
 import type {
   MaintenanceBreakdown,
   Society,
@@ -1142,20 +1142,28 @@ function EditUnitDialog({
 
 // ─── Main Properties Component ────────────────────────────────────────────────
 
-export default function Properties({ role }: { role?: AppRole }) {
+export default function Properties({
+  role,
+  societyId,
+}: { role?: AppRole; societyId?: number | null }) {
   const store = useSocietyStore();
   // version counter to force re-render after mutations
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
 
-  const towers = store.getTowers();
-  const units = store.getUnits();
+  const towers = store.getTowers(societyId);
+  const units = store.getUnits(societyId);
   const societies = store.getSocieties();
-  const activeSocietyId = store.getActiveSocietyId();
+  const activeSocietyId = societyId ?? store.getActiveSocietyId();
 
-  // Only SuperAdmin and Admin (Committee Admin) can select society
-  const canSelectSociety =
-    role === "SuperAdmin" || role === "Admin" ? societies.length > 1 : false;
+  // Only committee roles can select society
+  const isCommitteeRole =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
+  const canSelectSociety = isCommitteeRole ? societies.length > 1 : false;
 
   const getSocietyName = (societyId: number) =>
     societies.find((s) => s.id === societyId)?.name ?? "—";

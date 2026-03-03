@@ -39,7 +39,8 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import type { AmcContract } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
@@ -115,6 +116,7 @@ interface AmcDialogProps {
   editingContract: AmcContract | null;
   onClose: () => void;
   onRefresh: () => void;
+  societyId?: number | null;
 }
 
 function AmcDialog({
@@ -122,9 +124,10 @@ function AmcDialog({
   editingContract,
   onClose,
   onRefresh,
+  societyId: propSocietyId,
 }: AmcDialogProps) {
   const store = useSocietyStore();
-  const societyId = store.getActiveSocietyId();
+  const societyId = propSocietyId ?? store.getActiveSocietyId();
 
   const [form, setFormState] = useState<AmcFormData>(() =>
     editingContract
@@ -351,9 +354,10 @@ function AmcDialog({
 
 interface AmcTrackerProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function AmcTracker({ role }: AmcTrackerProps) {
+export default function AmcTracker({ role, societyId }: AmcTrackerProps) {
   const store = useSocietyStore();
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
@@ -363,7 +367,12 @@ export default function AmcTracker({ role }: AmcTrackerProps) {
     null,
   );
 
-  const canEdit = role === "SuperAdmin" || role === "Admin";
+  const canEdit =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   if (!canEdit) {
     return (
@@ -384,7 +393,10 @@ export default function AmcTracker({ role }: AmcTrackerProps) {
     );
   }
 
-  const allContracts = store.getAmcContracts();
+  const allContracts =
+    societyId != null
+      ? store.getAmcContracts().filter((c) => c.societyId === societyId)
+      : store.getAmcContracts();
 
   // Compute live status for each contract
   const contractsWithStatus = allContracts.map((c) => ({
@@ -424,17 +436,31 @@ export default function AmcTracker({ role }: AmcTrackerProps) {
             Annual Maintenance Contracts — track expiry and renewals
           </p>
         </div>
-        <Button
-          className="gap-2 font-body"
-          style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
-          onClick={() => {
-            setEditingContract(null);
-            setDialogOpen(true);
-          }}
-        >
-          <Plus className="w-4 h-4" />
-          Add Contract
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {allContracts.length > 0 && (
+            <DeleteAllDialog
+              label="Delete All AMC Records"
+              description="Are you sure you want to delete all AMC contracts? This action cannot be undone."
+              onConfirm={() => {
+                store.deleteAllAmcContracts(societyId);
+                toast.success("All AMC contracts deleted");
+                refresh();
+              }}
+              ocidScope="amc"
+            />
+          )}
+          <Button
+            className="gap-2 font-body"
+            style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
+            onClick={() => {
+              setEditingContract(null);
+              setDialogOpen(true);
+            }}
+          >
+            <Plus className="w-4 h-4" />
+            Add Contract
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -684,6 +710,7 @@ export default function AmcTracker({ role }: AmcTrackerProps) {
           setEditingContract(null);
         }}
         onRefresh={refresh}
+        societyId={societyId}
       />
     </div>
   );

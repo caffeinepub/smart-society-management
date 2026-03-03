@@ -2,6 +2,9 @@ import {
   Briefcase,
   Building2,
   ChevronRight,
+  Crown,
+  DollarSign,
+  FileText,
   Home,
   Shield,
   Users,
@@ -11,6 +14,9 @@ import { motion } from "motion/react";
 export type AppRole =
   | "SuperAdmin"
   | "Admin"
+  | "Chairman"
+  | "Secretary"
+  | "Treasurer"
   | "SecurityGuard"
   | "Resident"
   | "Staff";
@@ -56,6 +62,48 @@ const roles: RoleOption[] = [
       "Analytics",
     ],
     color: "from-violet-600 to-purple-700",
+  },
+  {
+    id: "Chairman",
+    label: "Chairman",
+    description: "Society committee chairman with full admin access",
+    icon: <Crown className="w-6 h-6" />,
+    permissions: [
+      "Dashboard",
+      "Properties",
+      "Billing",
+      "Communication",
+      "Analytics",
+    ],
+    color: "from-amber-500 to-yellow-600",
+  },
+  {
+    id: "Secretary",
+    label: "Secretary",
+    description: "Handle communication, notices, and documentation",
+    icon: <FileText className="w-6 h-6" />,
+    permissions: [
+      "Dashboard",
+      "Properties",
+      "Communication",
+      "Staff",
+      "Analytics",
+    ],
+    color: "from-teal-500 to-cyan-600",
+  },
+  {
+    id: "Treasurer",
+    label: "Treasurer",
+    description: "Manage finances, billing, and expenses",
+    icon: <DollarSign className="w-6 h-6" />,
+    permissions: [
+      "Dashboard",
+      "Billing",
+      "Expenses",
+      "P&L Statement",
+      "Analytics",
+    ],
+    color: "from-emerald-600 to-green-700",
   },
   {
     id: "SecurityGuard",

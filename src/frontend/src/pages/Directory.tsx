@@ -27,7 +27,7 @@ import {
 import { BookUser, Mail, Phone, Users } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
-import type { AppRole } from "../components/RoleSelection";
+import type { AppRole } from "../store/societyStore";
 import type { Unit } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
@@ -189,11 +189,17 @@ function UnitDetailDialog({ unit, open, onClose }: UnitDetailDialogProps) {
 
 interface DirectoryProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function Directory({ role }: DirectoryProps) {
+export default function Directory({ role, societyId }: DirectoryProps) {
   const store = useSocietyStore();
-  const isAdmin = role === "SuperAdmin" || role === "Admin";
+  const isAdmin =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("All");
@@ -201,7 +207,7 @@ export default function Directory({ role }: DirectoryProps) {
   const [selectedUnit, setSelectedUnit] = useState<Unit | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
 
-  const allUnits = store.getUnits();
+  const allUnits = store.getUnits(societyId);
 
   const filtered = allUnits.filter((u) => {
     const matchSearch =

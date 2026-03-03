@@ -55,14 +55,16 @@ const last7Days = Array.from({ length: 7 }, (_, i) => {
   return d.toLocaleDateString("en-IN", { weekday: "short", day: "numeric" });
 });
 
-export default function Analytics() {
+export default function Analytics({
+  societyId,
+}: { societyId?: number | null }) {
   const store = useSocietyStore();
 
-  const bills = store.getBills();
-  const units = store.getUnits();
-  const complaints = store.getComplaints();
-  const visitors = store.getVisitors();
-  const financialSummary = store.getFinancialSummary();
+  const bills = store.getBills(societyId);
+  const units = store.getUnits(societyId);
+  const complaints = store.getComplaints(societyId);
+  const visitors = store.getVisitors(societyId);
+  const financialSummary = store.getFinancialSummary(societyId);
 
   // Occupancy donut
   const totalUnits = units.length;

@@ -36,7 +36,8 @@ import {
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
 const complaintCategories = [
@@ -85,7 +86,12 @@ export default function Complaints({ role }: ComplaintsProps) {
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
 
-  const isAdmin = role === "SuperAdmin" || role === "Admin";
+  const isAdmin =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   // File complaint form
   const [complaintOpen, setComplaintOpen] = useState(false);
@@ -168,115 +174,129 @@ export default function Complaints({ role }: ComplaintsProps) {
             Resident complaints and issue tracking
           </p>
         </div>
-        <Dialog open={complaintOpen} onOpenChange={setComplaintOpen}>
-          <DialogTrigger asChild>
-            <Button
-              className="gap-2 font-body"
-              style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
-            >
-              <Plus className="w-4 h-4" />
-              File Complaint
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="font-display flex items-center gap-2">
-                <MessageSquare
-                  className="w-5 h-5"
-                  style={{ color: "oklch(0.52 0.18 243)" }}
-                />
-                File a Complaint
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4 pt-2">
-              <div className="space-y-1.5">
-                <Label className="font-body">Title *</Label>
-                <Input
-                  value={complaintTitle}
-                  onChange={(e) => setComplaintTitle(e.target.value)}
-                  placeholder="Brief description of the issue"
-                  className="font-body"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="font-body">Category</Label>
-                  <Select
-                    value={complaintCategory}
-                    onValueChange={setComplaintCategory}
-                  >
-                    <SelectTrigger className="font-body">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {complaintCategories.map((c) => (
-                        <SelectItem key={c} value={c} className="font-body">
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-body">Priority</Label>
-                  <Select
-                    value={complaintPriority}
-                    onValueChange={setComplaintPriority}
-                  >
-                    <SelectTrigger className="font-body">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {["Low", "Medium", "High", "Critical"].map((p) => (
-                        <SelectItem key={p} value={p} className="font-body">
-                          {p}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <Label className="font-body">Your Name *</Label>
-                  <Input
-                    value={complaintName}
-                    onChange={(e) => setComplaintName(e.target.value)}
-                    placeholder="Full name"
-                    className="font-body"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-body">Unit Number *</Label>
-                  <Input
-                    value={complaintUnit}
-                    onChange={(e) => setComplaintUnit(e.target.value)}
-                    placeholder="e.g. A-301"
-                    className="font-body"
-                  />
-                </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label className="font-body">Description</Label>
-                <Textarea
-                  value={complaintDesc}
-                  onChange={(e) => setComplaintDesc(e.target.value)}
-                  placeholder="Detailed description of the issue..."
-                  rows={3}
-                  className="font-body"
-                />
-              </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {isAdmin && allComplaints.length > 0 && (
+            <DeleteAllDialog
+              label="Delete All Complaints"
+              description="Are you sure you want to delete all complaints? This action cannot be undone."
+              onConfirm={() => {
+                store.deleteAllComplaints();
+                toast.success("All complaints deleted");
+                refresh();
+              }}
+              ocidScope="complaints"
+            />
+          )}
+          <Dialog open={complaintOpen} onOpenChange={setComplaintOpen}>
+            <DialogTrigger asChild>
               <Button
-                className="w-full font-body"
-                onClick={handleCreateComplaint}
-                disabled={!complaintTitle || !complaintUnit || !complaintName}
+                className="gap-2 font-body"
                 style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
               >
-                Submit Complaint
+                <Plus className="w-4 h-4" />
+                File Complaint
               </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle className="font-display flex items-center gap-2">
+                  <MessageSquare
+                    className="w-5 h-5"
+                    style={{ color: "oklch(0.52 0.18 243)" }}
+                  />
+                  File a Complaint
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-2">
+                <div className="space-y-1.5">
+                  <Label className="font-body">Title *</Label>
+                  <Input
+                    value={complaintTitle}
+                    onChange={(e) => setComplaintTitle(e.target.value)}
+                    placeholder="Brief description of the issue"
+                    className="font-body"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Category</Label>
+                    <Select
+                      value={complaintCategory}
+                      onValueChange={setComplaintCategory}
+                    >
+                      <SelectTrigger className="font-body">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {complaintCategories.map((c) => (
+                          <SelectItem key={c} value={c} className="font-body">
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Priority</Label>
+                    <Select
+                      value={complaintPriority}
+                      onValueChange={setComplaintPriority}
+                    >
+                      <SelectTrigger className="font-body">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {["Low", "Medium", "High", "Critical"].map((p) => (
+                          <SelectItem key={p} value={p} className="font-body">
+                            {p}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Your Name *</Label>
+                    <Input
+                      value={complaintName}
+                      onChange={(e) => setComplaintName(e.target.value)}
+                      placeholder="Full name"
+                      className="font-body"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Unit Number *</Label>
+                    <Input
+                      value={complaintUnit}
+                      onChange={(e) => setComplaintUnit(e.target.value)}
+                      placeholder="e.g. A-301"
+                      className="font-body"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="font-body">Description</Label>
+                  <Textarea
+                    value={complaintDesc}
+                    onChange={(e) => setComplaintDesc(e.target.value)}
+                    placeholder="Detailed description of the issue..."
+                    rows={3}
+                    className="font-body"
+                  />
+                </div>
+                <Button
+                  className="w-full font-body"
+                  onClick={handleCreateComplaint}
+                  disabled={!complaintTitle || !complaintUnit || !complaintName}
+                  style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
+                >
+                  Submit Complaint
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {/* KPI Summary */}

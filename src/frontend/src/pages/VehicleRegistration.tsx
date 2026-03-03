@@ -28,7 +28,8 @@ import { Bike, Car, Edit2, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import type { Vehicle } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
@@ -78,6 +79,7 @@ interface VehicleDialogProps {
   editingVehicle: Vehicle | null;
   onClose: () => void;
   onRefresh: () => void;
+  societyId?: number | null;
 }
 
 function VehicleDialog({
@@ -85,10 +87,11 @@ function VehicleDialog({
   editingVehicle,
   onClose,
   onRefresh,
+  societyId: propSocietyId,
 }: VehicleDialogProps) {
   const store = useSocietyStore();
-  const societyId = store.getActiveSocietyId();
-  const allUnits = store.getUnits();
+  const societyId = propSocietyId ?? store.getActiveSocietyId();
+  const allUnits = store.getUnits(propSocietyId);
 
   const [form, setFormState] = useState<VehicleFormData>(() =>
     editingVehicle
@@ -291,10 +294,12 @@ function VehicleDialog({
 
 interface VehicleRegistrationProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
 export default function VehicleRegistration({
   role,
+  societyId,
 }: VehicleRegistrationProps) {
   const store = useSocietyStore();
   const [, setVersion] = useState(0);
@@ -305,12 +310,20 @@ export default function VehicleRegistration({
   const [search, setSearch] = useState("");
   const [filterType, setFilterType] = useState("All");
 
-  const canEdit = role === "SuperAdmin" || role === "Admin";
+  const canEdit =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
   const isSecurityGuard = role === "SecurityGuard";
   const isResident = role === "Resident";
   const canAdd = canEdit || isResident;
 
-  const allVehicles = store.getVehicles();
+  const allVehicles =
+    societyId != null
+      ? store.getVehicles().filter((v) => v.societyId === societyId)
+      : store.getVehicles();
 
   const filtered = allVehicles.filter((v) => {
     const matchSearch =
@@ -348,19 +361,33 @@ export default function VehicleRegistration({
               : "Manage registered vehicles for all units"}
           </p>
         </div>
-        {canAdd && (
-          <Button
-            className="gap-2 font-body"
-            style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
-            onClick={() => {
-              setEditingVehicle(null);
-              setDialogOpen(true);
-            }}
-          >
-            <Plus className="w-4 h-4" />
-            Register Vehicle
-          </Button>
-        )}
+        <div className="flex items-center gap-2 flex-wrap">
+          {canEdit && allVehicles.length > 0 && (
+            <DeleteAllDialog
+              label="Delete All Vehicles"
+              description="Are you sure you want to delete all registered vehicles? This action cannot be undone."
+              onConfirm={() => {
+                store.deleteAllVehicles(societyId);
+                toast.success("All vehicles deleted");
+                refresh();
+              }}
+              ocidScope="vehicles"
+            />
+          )}
+          {canAdd && (
+            <Button
+              className="gap-2 font-body"
+              style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
+              onClick={() => {
+                setEditingVehicle(null);
+                setDialogOpen(true);
+              }}
+            >
+              <Plus className="w-4 h-4" />
+              Register Vehicle
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -598,6 +625,7 @@ export default function VehicleRegistration({
           setEditingVehicle(null);
         }}
         onRefresh={refresh}
+        societyId={societyId}
       />
     </div>
   );

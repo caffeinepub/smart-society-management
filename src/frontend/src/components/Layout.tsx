@@ -3,16 +3,17 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertCircle,
   BarChart3,
   Bell,
   BookUser,
   Building2,
   Car,
   ChevronDown,
+  Eye,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -28,7 +29,9 @@ import {
 } from "lucide-react";
 import { AnimatePresence, motion } from "motion/react";
 import { useState } from "react";
-import type { AppRole } from "./RoleSelection";
+import { useAuth } from "../store/AuthContext";
+import type { AppRole } from "../store/societyStore";
+import { useSocietyStore } from "../store/societyStore";
 
 interface NavItem {
   id: string;
@@ -37,102 +40,135 @@ interface NavItem {
   roles: AppRole[];
 }
 
+const COMMITTEE_ROLES: AppRole[] = [
+  "SuperAdmin",
+  "Admin",
+  "Chairman",
+  "Secretary",
+  "Treasurer",
+];
+
 const navItems: NavItem[] = [
   {
     id: "dashboard",
     label: "Dashboard",
     icon: <LayoutDashboard className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "SecurityGuard", "Resident", "Staff"],
+    roles: [
+      "SuperAdmin",
+      "Admin",
+      "Chairman",
+      "Secretary",
+      "Treasurer",
+      "SecurityGuard",
+      "Resident",
+      "Staff",
+    ],
   },
   {
     id: "properties",
     label: "Properties",
     icon: <Building2 className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin"],
+    roles: [...COMMITTEE_ROLES],
   },
   {
     id: "billing",
     label: "Billing",
     icon: <Receipt className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Resident"],
+    roles: [...COMMITTEE_ROLES, "Resident"],
   },
   {
     id: "security",
     label: "Security",
     icon: <Shield className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "SecurityGuard"],
+    roles: [...COMMITTEE_ROLES, "SecurityGuard"],
   },
   {
     id: "communication",
     label: "Communication",
     icon: <MessageSquare className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Resident"],
+    roles: [...COMMITTEE_ROLES, "Resident"],
   },
   {
     id: "staff",
     label: "Staff",
     icon: <Users className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Staff"],
+    roles: [...COMMITTEE_ROLES, "Staff"],
   },
   {
     id: "expenses",
     label: "Expenses",
     icon: <TrendingDown className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin"],
+    roles: [...COMMITTEE_ROLES],
   },
   {
     id: "analytics",
     label: "Analytics",
     icon: <BarChart3 className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin"],
+    roles: [...COMMITTEE_ROLES],
   },
   {
     id: "pnl",
     label: "P&L Statement",
     icon: <TrendingUp className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin"],
+    roles: [...COMMITTEE_ROLES],
   },
   {
     id: "directory",
     label: "Directory",
     icon: <BookUser className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Resident", "Staff", "SecurityGuard"],
+    roles: [
+      "SuperAdmin",
+      "Admin",
+      "Chairman",
+      "Secretary",
+      "Treasurer",
+      "Resident",
+      "Staff",
+      "SecurityGuard",
+    ],
   },
   {
     id: "vehicles",
     label: "Vehicles",
     icon: <Car className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "SecurityGuard", "Resident"],
+    roles: [
+      "SuperAdmin",
+      "Admin",
+      "Chairman",
+      "Secretary",
+      "Treasurer",
+      "SecurityGuard",
+      "Resident",
+    ],
   },
   {
     id: "amc",
     label: "AMC Tracker",
     icon: <Wrench className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin"],
-  },
-  {
-    id: "notices",
-    label: "Notices",
-    icon: <Bell className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Resident"],
-  },
-  {
-    id: "complaints",
-    label: "Complaints",
-    icon: <AlertCircle className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Resident", "SecurityGuard"],
+    roles: [...COMMITTEE_ROLES],
   },
   {
     id: "settings",
     label: "Settings",
     icon: <Settings className="w-4.5 h-4.5" />,
-    roles: ["SuperAdmin", "Admin", "Resident", "Staff"],
+    roles: [
+      "SuperAdmin",
+      "Admin",
+      "Chairman",
+      "Secretary",
+      "Treasurer",
+      "Resident",
+      "Staff",
+    ],
   },
 ];
 
 const roleLabels: Record<AppRole, string> = {
   SuperAdmin: "Super Admin",
   Admin: "Committee Admin",
+  Chairman: "Chairman",
+  Secretary: "Secretary",
+  Treasurer: "Treasurer",
   SecurityGuard: "Security Guard",
   Resident: "Resident",
   Staff: "Society Staff",
@@ -144,6 +180,8 @@ interface LayoutProps {
   role: AppRole;
   onRoleChange: () => void;
   children: React.ReactNode;
+  viewAsSocietyId?: number | null;
+  onViewAsSocietyChange?: (societyId: number | null) => void;
 }
 
 export default function Layout({
@@ -152,10 +190,22 @@ export default function Layout({
   role,
   onRoleChange,
   children,
+  viewAsSocietyId,
+  onViewAsSocietyChange,
 }: LayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const { currentUser } = useAuth();
+  const store = useSocietyStore();
+  const displayName = currentUser?.name ?? roleLabels[role];
+  const societies = store.getSocieties();
+  const isSuperAdmin = role === "SuperAdmin";
 
   const visibleItems = navItems.filter((item) => item.roles.includes(role));
+
+  const activeSocietyName =
+    viewAsSocietyId != null
+      ? (societies.find((s) => s.id === viewAsSocietyId)?.name ?? "Unknown")
+      : "All Societies";
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -189,7 +239,7 @@ export default function Layout({
         </div>
       </div>
 
-      {/* Role indicator */}
+      {/* User indicator */}
       <div
         className="mx-3 mt-3 mb-1 px-3 py-2.5 rounded-lg"
         style={{ background: "oklch(var(--sidebar-accent))" }}
@@ -201,8 +251,14 @@ export default function Layout({
           Signed in as
         </p>
         <p
-          className="font-display font-semibold text-sm"
+          className="font-display font-semibold text-sm truncate"
           style={{ color: "oklch(var(--sidebar-primary))" }}
+        >
+          {displayName}
+        </p>
+        <p
+          className="text-xs font-body mt-0.5"
+          style={{ color: "oklch(0.52 0.03 248)" }}
         >
           {roleLabels[role]}
         </p>
@@ -278,7 +334,7 @@ export default function Layout({
           onClick={onRoleChange}
         >
           <LogOut className="w-3.5 h-3.5" />
-          Switch Role
+          Log Out
         </Button>
         <p
           className="text-xs font-body text-center mt-3"
@@ -365,11 +421,95 @@ export default function Layout({
             <Menu className="w-5 h-5" />
           </Button>
 
-          <div className="flex-1">
+          <div className="flex-1 flex items-center gap-3">
             <h1 className="font-display font-semibold text-base capitalize">
               {visibleItems.find((i) => i.id === currentPage)?.label ??
                 "Dashboard"}
             </h1>
+
+            {/* Society Switcher — SuperAdmin only */}
+            {isSuperAdmin && onViewAsSocietyChange && societies.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="gap-1.5 font-body text-xs h-7 px-2.5 max-w-44 truncate"
+                    style={{
+                      borderColor:
+                        viewAsSocietyId != null
+                          ? "oklch(0.52 0.18 243 / 0.5)"
+                          : undefined,
+                      color:
+                        viewAsSocietyId != null
+                          ? "oklch(0.45 0.15 243)"
+                          : undefined,
+                      background:
+                        viewAsSocietyId != null
+                          ? "oklch(0.95 0.04 243)"
+                          : undefined,
+                    }}
+                  >
+                    <Eye className="w-3 h-3 flex-shrink-0" />
+                    <span className="truncate">{activeSocietyName}</span>
+                    <ChevronDown className="w-3 h-3 flex-shrink-0 opacity-50" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="min-w-48">
+                  <DropdownMenuItem
+                    className="font-body text-xs opacity-60 cursor-default"
+                    disabled
+                  >
+                    <Eye className="w-3.5 h-3.5 mr-1.5" />
+                    View as Society
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="font-body text-sm"
+                    onClick={() => onViewAsSocietyChange(null)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {viewAsSocietyId === null && (
+                        <span
+                          className="w-1.5 h-1.5 rounded-full"
+                          style={{ background: "oklch(0.52 0.18 243)" }}
+                        />
+                      )}
+                      <span
+                        className={
+                          viewAsSocietyId === null ? "font-semibold" : ""
+                        }
+                      >
+                        All Societies (Global View)
+                      </span>
+                    </div>
+                  </DropdownMenuItem>
+                  {societies.map((s) => (
+                    <DropdownMenuItem
+                      key={s.id}
+                      className="font-body text-sm"
+                      onClick={() => onViewAsSocietyChange(s.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        {viewAsSocietyId === s.id && (
+                          <span
+                            className="w-1.5 h-1.5 rounded-full flex-shrink-0"
+                            style={{ background: "oklch(0.52 0.18 243)" }}
+                          />
+                        )}
+                        <span
+                          className={
+                            viewAsSocietyId === s.id ? "font-semibold" : ""
+                          }
+                        >
+                          {s.name}
+                        </span>
+                      </div>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -391,18 +531,24 @@ export default function Layout({
                     className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-display font-bold"
                     style={{ background: "oklch(var(--primary))" }}
                   >
-                    {roleLabels[role].slice(0, 1)}
+                    {displayName.slice(0, 1).toUpperCase()}
                   </div>
-                  <span className="hidden sm:block text-sm">
-                    {roleLabels[role]}
+                  <span className="hidden sm:block text-sm max-w-28 truncate">
+                    {displayName}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="font-body text-xs opacity-60 cursor-default"
+                  disabled
+                >
+                  {roleLabels[role]}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onRoleChange}>
                   <LogOut className="w-4 h-4 mr-2" />
-                  Switch Role
+                  Log Out
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

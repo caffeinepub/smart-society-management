@@ -18,11 +18,20 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Bell, Pin, Plus, Search } from "lucide-react";
+import {
+  Bell,
+  Pin,
+  Plus,
+  Search,
+  ToggleLeft,
+  ToggleRight,
+  Trash2,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
 const noticeCategories = [
@@ -80,7 +89,12 @@ export default function Notices({ role }: NoticesProps) {
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
 
-  const isAdmin = role === "SuperAdmin" || role === "Admin";
+  const isAdmin =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [noticeTitle, setNoticeTitle] = useState("");
@@ -127,75 +141,92 @@ export default function Notices({ role }: NoticesProps) {
           </p>
         </div>
         {isAdmin && (
-          <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
-            <DialogTrigger asChild>
-              <Button
-                className="gap-2 font-body"
-                style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
-              >
-                <Plus className="w-4 h-4" />
-                Post Notice
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle className="font-display flex items-center gap-2">
-                  <Bell
-                    className="w-5 h-5"
-                    style={{ color: "oklch(0.52 0.18 243)" }}
-                  />
-                  Post New Notice
-                </DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4 pt-2">
-                <div className="space-y-1.5">
-                  <Label className="font-body">Title</Label>
-                  <Input
-                    value={noticeTitle}
-                    onChange={(e) => setNoticeTitle(e.target.value)}
-                    placeholder="Notice title"
-                    className="font-body"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-body">Category</Label>
-                  <Select
-                    value={noticeCategory}
-                    onValueChange={setNoticeCategory}
-                  >
-                    <SelectTrigger className="font-body">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {noticeCategories.map((c) => (
-                        <SelectItem key={c} value={c} className="font-body">
-                          {c}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <Label className="font-body">Content</Label>
-                  <Textarea
-                    value={noticeContent}
-                    onChange={(e) => setNoticeContent(e.target.value)}
-                    placeholder="Notice content..."
-                    rows={4}
-                    className="font-body"
-                  />
-                </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {allNotices.length > 0 && (
+              <DeleteAllDialog
+                label="Delete All Notices"
+                description="Are you sure you want to delete all notices? This action cannot be undone."
+                onConfirm={() => {
+                  store.deleteAllNotices();
+                  toast.success("All notices deleted");
+                  refresh();
+                }}
+                ocidScope="notices"
+              />
+            )}
+            <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
+              <DialogTrigger asChild>
                 <Button
-                  className="w-full font-body"
-                  onClick={handleCreateNotice}
-                  disabled={!noticeTitle || !noticeContent}
+                  className="gap-2 font-body"
                   style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
                 >
+                  <Plus className="w-4 h-4" />
                   Post Notice
                 </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle className="font-display flex items-center gap-2">
+                    <Bell
+                      className="w-5 h-5"
+                      style={{ color: "oklch(0.52 0.18 243)" }}
+                    />
+                    Post New Notice
+                  </DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Title</Label>
+                    <Input
+                      value={noticeTitle}
+                      onChange={(e) => setNoticeTitle(e.target.value)}
+                      placeholder="Notice title"
+                      className="font-body"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Category</Label>
+                    <Select
+                      value={noticeCategory}
+                      onValueChange={setNoticeCategory}
+                    >
+                      <SelectTrigger className="font-body">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {noticeCategories.map((c) => (
+                          <SelectItem key={c} value={c} className="font-body">
+                            {c}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="font-body">Content</Label>
+                    <Textarea
+                      value={noticeContent}
+                      onChange={(e) => setNoticeContent(e.target.value)}
+                      placeholder="Notice content..."
+                      rows={4}
+                      className="font-body"
+                    />
+                  </div>
+                  <Button
+                    className="w-full font-body"
+                    onClick={handleCreateNotice}
+                    disabled={!noticeTitle || !noticeContent}
+                    style={{
+                      background: "oklch(0.52 0.18 243)",
+                      color: "#fff",
+                    }}
+                  >
+                    Post Notice
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
         )}
       </div>
 
@@ -323,16 +354,76 @@ export default function Notices({ role }: NoticesProps) {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: i * 0.06 }}
               >
-                <Card className="h-full hover:shadow-md transition-shadow">
+                <Card
+                  className={`h-full hover:shadow-md transition-shadow ${!notice.isActive ? "opacity-60 border-dashed" : ""}`}
+                >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
-                      <Badge
-                        className="font-body text-xs flex-shrink-0"
-                        style={getNoticeCategoryStyle(notice.category)}
-                      >
-                        {notice.category}
-                      </Badge>
-                      <Pin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge
+                          className="font-body text-xs flex-shrink-0"
+                          style={getNoticeCategoryStyle(notice.category)}
+                        >
+                          {notice.category}
+                        </Badge>
+                        {!notice.isActive && (
+                          <Badge
+                            className="font-body text-xs flex-shrink-0"
+                            style={{
+                              background: "oklch(0.93 0.015 245)",
+                              color: "oklch(0.5 0.03 248)",
+                              border: "1px solid oklch(0.85 0.02 245)",
+                            }}
+                          >
+                            Disabled
+                          </Badge>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {isAdmin && (
+                          <>
+                            <button
+                              type="button"
+                              title={
+                                notice.isActive
+                                  ? "Disable notice"
+                                  : "Enable notice"
+                              }
+                              data-ocid={`notices.toggle.${i + 1}`}
+                              className="p-1 rounded hover:bg-accent transition-colors"
+                              onClick={() => {
+                                store.toggleNoticeActive(notice.id);
+                                toast.success(
+                                  notice.isActive
+                                    ? "Notice disabled"
+                                    : "Notice enabled",
+                                );
+                                refresh();
+                              }}
+                            >
+                              {notice.isActive ? (
+                                <ToggleRight className="w-4 h-4 text-emerald-600" />
+                              ) : (
+                                <ToggleLeft className="w-4 h-4 text-muted-foreground" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              title="Delete notice"
+                              data-ocid={`notices.delete_button.${i + 1}`}
+                              className="p-1 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
+                              onClick={() => {
+                                store.deleteNotice(notice.id);
+                                toast.success("Notice deleted");
+                                refresh();
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </>
+                        )}
+                        <Pin className="w-3.5 h-3.5 text-muted-foreground mt-0.5" />
+                      </div>
                     </div>
                     <CardTitle className="font-display text-base leading-snug mt-1">
                       {notice.title}

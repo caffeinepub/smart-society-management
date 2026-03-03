@@ -15,6 +15,28 @@ import {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+export type AppRole =
+  | "SuperAdmin"
+  | "Admin"
+  | "Chairman"
+  | "Secretary"
+  | "Treasurer"
+  | "SecurityGuard"
+  | "Resident"
+  | "Staff";
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  passwordHash: string;
+  role: AppRole;
+  societyId?: number; // null/undefined for SuperAdmin, required for all others
+  unitId?: number;
+  unitNumber?: string;
+  createdAt: string;
+}
+
 export interface Society {
   id: number;
   name: string;
@@ -22,6 +44,7 @@ export interface Society {
   city: string;
   registrationNumber: string;
   contactPhone: string;
+  isEnabled: boolean; // true = active/enabled, false = inactive/suspended
 }
 
 export interface SocietyInfo {
@@ -61,6 +84,7 @@ export interface Unit {
   monthlyMaintenance: number; // grand total (breakdown sum + previousDue)
   maintenanceBreakdown?: MaintenanceBreakdown;
   previousDue?: number;
+  societyId: number;
   // Extended unit details
   area?: number; // in sqft
   ownershipType?: string; // e.g. "Owner", "Tenant", "Co-owner"
@@ -94,6 +118,7 @@ export interface Bill {
   month: number;
   year: number;
   status: string; // "Paid" | "Pending" | "Overdue"
+  societyId: number;
 }
 
 export interface Payment {
@@ -120,6 +145,7 @@ export interface Visitor {
   checkInTime: string;
   checkOutTime: string | null;
   status: string; // "Active" | "CheckedOut"
+  societyId: number;
 }
 
 export interface Notice {
@@ -130,6 +156,7 @@ export interface Notice {
   postedBy: string;
   postedAt: string;
   isActive: boolean;
+  societyId: number;
 }
 
 export interface Complaint {
@@ -143,6 +170,7 @@ export interface Complaint {
   priority: string; // "Low" | "Medium" | "High" | "Critical"
   createdAt: string;
   resolution: string | null;
+  societyId: number;
 }
 
 export interface PollOption {
@@ -158,6 +186,7 @@ export interface Poll {
   createdBy: string;
   createdAt: string;
   isActive: boolean;
+  societyId: number;
 }
 
 export interface Staff {
@@ -168,6 +197,7 @@ export interface Staff {
   salary: number;
   joiningDate: string;
   isActive: boolean;
+  societyId: number;
 }
 
 export interface Attendance {
@@ -248,994 +278,68 @@ interface StoreState {
   expenses: Expense[];
   vehicles: Vehicle[];
   amcContracts: AmcContract[];
+  users: User[];
+  currentUserId: number | null;
   nextId: number;
 }
 
 // ─── Seed data ────────────────────────────────────────────────────────────────
 
-const CURRENT_YEAR = new Date().getFullYear();
-
 function buildSeedData(): StoreState {
-  const towers: Tower[] = [
-    { id: 1, name: "Tower A", totalFloors: 12, societyId: 1 },
-    { id: 2, name: "Tower B", totalFloors: 10, societyId: 1 },
-    { id: 3, name: "Tower C", totalFloors: 8, societyId: 1 },
-  ];
+  const towers: Tower[] = [];
 
-  const units: Unit[] = [
-    {
-      id: 1,
-      towerId: 1,
-      unitNumber: "A-101",
-      floor: 1,
-      ownerName: "Rajesh Kumar",
-      isOccupied: true,
-      monthlyMaintenance: 3500,
-    },
-    {
-      id: 2,
-      towerId: 1,
-      unitNumber: "A-203",
-      floor: 2,
-      ownerName: "Sunita Sharma",
-      isOccupied: true,
-      monthlyMaintenance: 3500,
-    },
-    {
-      id: 3,
-      towerId: 1,
-      unitNumber: "A-301",
-      floor: 3,
-      ownerName: "Amit Verma",
-      isOccupied: true,
-      monthlyMaintenance: 4000,
-    },
-    {
-      id: 4,
-      towerId: 1,
-      unitNumber: "A-405",
-      floor: 4,
-      ownerName: "Priya Nair",
-      isOccupied: false,
-      monthlyMaintenance: 4000,
-    },
-    {
-      id: 5,
-      towerId: 2,
-      unitNumber: "B-102",
-      floor: 1,
-      ownerName: "Vikram Shah",
-      isOccupied: true,
-      monthlyMaintenance: 3000,
-    },
-    {
-      id: 6,
-      towerId: 2,
-      unitNumber: "B-203",
-      floor: 2,
-      ownerName: "Priya Singh",
-      isOccupied: true,
-      monthlyMaintenance: 3000,
-    },
-    {
-      id: 7,
-      towerId: 2,
-      unitNumber: "B-304",
-      floor: 3,
-      ownerName: "Deepak Rao",
-      isOccupied: false,
-      monthlyMaintenance: 3500,
-    },
-    {
-      id: 8,
-      towerId: 2,
-      unitNumber: "B-401",
-      floor: 4,
-      ownerName: "Meena Pillai",
-      isOccupied: true,
-      monthlyMaintenance: 4500,
-    },
-    {
-      id: 9,
-      towerId: 3,
-      unitNumber: "C-102",
-      floor: 1,
-      ownerName: "Arjun Mehta",
-      isOccupied: true,
-      monthlyMaintenance: 2500,
-    },
-    {
-      id: 10,
-      towerId: 3,
-      unitNumber: "C-105",
-      floor: 1,
-      ownerName: "Kavitha Reddy",
-      isOccupied: true,
-      monthlyMaintenance: 2500,
-    },
-    {
-      id: 11,
-      towerId: 3,
-      unitNumber: "C-201",
-      floor: 2,
-      ownerName: "Suresh Iyer",
-      isOccupied: false,
-      monthlyMaintenance: 3000,
-    },
-    {
-      id: 12,
-      towerId: 3,
-      unitNumber: "C-302",
-      floor: 3,
-      ownerName: "Lakshmi Patel",
-      isOccupied: true,
-      monthlyMaintenance: 3000,
-    },
-  ];
+  const units: Unit[] = [];
 
-  const bills: Bill[] = [
-    {
-      id: 1,
-      unitId: 1,
-      unitNumber: "A-101",
-      amount: 3500,
-      previousDue: 0,
-      grandTotal: 3500,
-      breakdown: {
-        serviceCharges: 2500,
-        nonOccupancyCharges: 300,
-        liftMaintenance: 300,
-        parkingCharges: 200,
-        sinkingFund: 100,
-        otherCharges: 100,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-02-10`,
-      month: 1,
-      year: CURRENT_YEAR,
-      status: "Paid",
-    },
-    {
-      id: 2,
-      unitId: 2,
-      unitNumber: "A-203",
-      amount: 3500,
-      previousDue: 0,
-      grandTotal: 3500,
-      breakdown: {
-        serviceCharges: 2500,
-        nonOccupancyCharges: 300,
-        liftMaintenance: 300,
-        parkingCharges: 200,
-        sinkingFund: 100,
-        otherCharges: 100,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-02-10`,
-      month: 1,
-      year: CURRENT_YEAR,
-      status: "Paid",
-    },
-    {
-      id: 3,
-      unitId: 5,
-      unitNumber: "B-102",
-      amount: 3000,
-      previousDue: 0,
-      grandTotal: 3000,
-      breakdown: {
-        serviceCharges: 2200,
-        nonOccupancyCharges: 250,
-        liftMaintenance: 250,
-        parkingCharges: 150,
-        sinkingFund: 100,
-        otherCharges: 50,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-02-10`,
-      month: 1,
-      year: CURRENT_YEAR,
-      status: "Paid",
-    },
-    {
-      id: 4,
-      unitId: 9,
-      unitNumber: "C-102",
-      amount: 2500,
-      previousDue: 0,
-      grandTotal: 2500,
-      breakdown: {
-        serviceCharges: 1800,
-        nonOccupancyCharges: 200,
-        liftMaintenance: 200,
-        parkingCharges: 150,
-        sinkingFund: 100,
-        otherCharges: 50,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-02-10`,
-      month: 1,
-      year: CURRENT_YEAR,
-      status: "Pending",
-    },
-    {
-      id: 5,
-      unitId: 3,
-      unitNumber: "A-301",
-      amount: 4000,
-      previousDue: 0,
-      grandTotal: 4000,
-      breakdown: {
-        serviceCharges: 2900,
-        nonOccupancyCharges: 350,
-        liftMaintenance: 350,
-        parkingCharges: 200,
-        sinkingFund: 100,
-        otherCharges: 100,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-03-10`,
-      month: 2,
-      year: CURRENT_YEAR,
-      status: "Paid",
-    },
-    {
-      id: 6,
-      unitId: 6,
-      unitNumber: "B-203",
-      amount: 3000,
-      previousDue: 500,
-      grandTotal: 3500,
-      breakdown: {
-        serviceCharges: 2200,
-        nonOccupancyCharges: 250,
-        liftMaintenance: 250,
-        parkingCharges: 150,
-        sinkingFund: 100,
-        otherCharges: 50,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-03-10`,
-      month: 2,
-      year: CURRENT_YEAR,
-      status: "Pending",
-    },
-    {
-      id: 7,
-      unitId: 10,
-      unitNumber: "C-105",
-      amount: 2500,
-      previousDue: 2500,
-      grandTotal: 5000,
-      breakdown: {
-        serviceCharges: 1800,
-        nonOccupancyCharges: 200,
-        liftMaintenance: 200,
-        parkingCharges: 150,
-        sinkingFund: 100,
-        otherCharges: 50,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-01-10`,
-      month: 12,
-      year: CURRENT_YEAR - 1,
-      status: "Overdue",
-    },
-    {
-      id: 8,
-      unitId: 8,
-      unitNumber: "B-401",
-      amount: 4500,
-      previousDue: 0,
-      grandTotal: 4500,
-      breakdown: {
-        serviceCharges: 3300,
-        nonOccupancyCharges: 400,
-        liftMaintenance: 400,
-        parkingCharges: 200,
-        sinkingFund: 100,
-        otherCharges: 100,
-        houseTax: 0,
-        repairMaintenance: 0,
-        interest: 0,
-      },
-      dueDate: `${CURRENT_YEAR}-03-10`,
-      month: 2,
-      year: CURRENT_YEAR,
-      status: "Paid",
-    },
-  ];
+  const bills: Bill[] = [];
 
-  const payments: Payment[] = [
-    {
-      id: 1,
-      billId: 1,
-      amount: 3500,
-      paidAt: `${CURRENT_YEAR}-01-28T10:30:00Z`,
-      paymentMethod: "UPI",
-    },
-    {
-      id: 2,
-      billId: 2,
-      amount: 3500,
-      paidAt: `${CURRENT_YEAR}-01-29T14:15:00Z`,
-      paymentMethod: "Online",
-    },
-    {
-      id: 3,
-      billId: 3,
-      amount: 3000,
-      paidAt: `${CURRENT_YEAR}-02-05T09:45:00Z`,
-      paymentMethod: "Bank Transfer",
-    },
-    {
-      id: 4,
-      billId: 5,
-      amount: 4000,
-      paidAt: `${CURRENT_YEAR}-02-20T11:00:00Z`,
-      paymentMethod: "Cash",
-    },
-    {
-      id: 5,
-      billId: 8,
-      amount: 4500,
-      paidAt: `${CURRENT_YEAR}-02-22T16:30:00Z`,
-      paymentMethod: "UPI",
-    },
-  ];
+  const payments: Payment[] = [];
 
-  const visitors: Visitor[] = [
-    {
-      id: 1,
-      name: "Ravi Shankar",
-      phone: "+91 98765 12345",
-      purpose: "Personal Visit",
-      hostUnit: "A-101",
-      hostUnitId: 1,
-      checkInTime: new Date(Date.now() - 45 * 60 * 1000).toISOString(),
-      checkOutTime: null,
-      status: "Active",
-    },
-    {
-      id: 2,
-      name: "Amazon Delivery",
-      phone: "+91 80045 67890",
-      purpose: "Package Delivery",
-      hostUnit: "B-203",
-      hostUnitId: 6,
-      checkInTime: new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString(),
-      checkOutTime: new Date(Date.now() - 2.5 * 60 * 60 * 1000).toISOString(),
-      status: "CheckedOut",
-    },
-    {
-      id: 3,
-      name: "Plumber – Ganesh",
-      phone: "+91 77654 32109",
-      purpose: "Maintenance Work",
-      hostUnit: "C-102",
-      hostUnitId: 9,
-      checkInTime: new Date(Date.now() - 5 * 60 * 60 * 1000).toISOString(),
-      checkOutTime: new Date(Date.now() - 3.5 * 60 * 60 * 1000).toISOString(),
-      status: "CheckedOut",
-    },
-    {
-      id: 4,
-      name: "Neha Kapoor",
-      phone: "+91 93245 88712",
-      purpose: "Guest Visit",
-      hostUnit: "A-301",
-      hostUnitId: 3,
-      checkInTime: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-      checkOutTime: null,
-      status: "Active",
-    },
-  ];
+  const visitors: Visitor[] = [];
 
-  const notices: Notice[] = [
-    {
-      id: 1,
-      title: "Annual General Body Meeting – March 2026",
-      content:
-        "All residents are cordially invited to attend the Annual General Body Meeting scheduled for 15th March 2026 at 6:00 PM in the Community Hall. Agenda: budget review, maintenance updates, and election of new committee members.",
-      category: "General",
-      postedBy: "Society Committee",
-      postedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true,
-    },
-    {
-      id: 2,
-      title: "Water Supply Interruption – Tower B",
-      content:
-        "Please note that water supply to Tower B will be interrupted on 5th March 2026 from 10 AM to 4 PM due to pipeline maintenance work. Residents are requested to store water in advance.",
-      category: "Maintenance",
-      postedBy: "Maintenance Team",
-      postedAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true,
-    },
-    {
-      id: 3,
-      title: "Maintenance Charge Revision – Effective April 2026",
-      content:
-        "The managing committee has approved a 8% revision in monthly maintenance charges effective from April 2026, to account for increased operational costs. Detailed breakdown will be shared separately.",
-      category: "Financial",
-      postedBy: "Treasurer",
-      postedAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true,
-    },
-  ];
+  const notices: Notice[] = [];
 
-  const complaints: Complaint[] = [
-    {
-      id: 1,
-      title: "Water leakage in bathroom ceiling",
-      description:
-        "There is persistent water leakage from the bathroom ceiling, likely from the unit above. The wall has developed damp patches and paint is peeling.",
-      category: "Plumbing",
-      unitNumber: "C-105",
-      residentName: "Kavitha Reddy",
-      status: "InProgress",
-      priority: "High",
-      createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: null,
-    },
-    {
-      id: 2,
-      title: "Lift frequently breaking down",
-      description:
-        "The lift in Tower A has broken down 4 times this month. It is particularly difficult for elderly residents and those living on higher floors.",
-      category: "Lift",
-      unitNumber: "A-405",
-      residentName: "Priya Nair",
-      status: "Open",
-      priority: "Critical",
-      createdAt: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: null,
-    },
-    {
-      id: 3,
-      title: "Garbage not collected for 3 days",
-      description:
-        "The cleaning staff have not collected garbage from the common bins near Block B for the past 3 days. It is causing a foul smell and attracting pests.",
-      category: "Cleanliness",
-      unitNumber: "B-102",
-      residentName: "Vikram Shah",
-      status: "Resolved",
-      priority: "Medium",
-      createdAt: new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution:
-        "Spoke with cleaning supervisor. Extra collection scheduled. Issue resolved.",
-    },
-    {
-      id: 4,
-      title: "Parking spot blocked by unknown vehicle",
-      description:
-        "An unknown vehicle has been parked in my reserved parking spot for the past 2 days. Despite leaving a note, the vehicle has not been moved.",
-      category: "Parking",
-      unitNumber: "B-401",
-      residentName: "Meena Pillai",
-      status: "Open",
-      priority: "Medium",
-      createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: null,
-    },
-    {
-      id: 5,
-      title: "Streetlight not working near Gate 2",
-      description:
-        "The streetlight near Gate 2 has been non-functional for over a week. The area becomes very dark at night and is a safety concern.",
-      category: "Electrical",
-      unitNumber: "A-203",
-      residentName: "Sunita Sharma",
-      status: "Open",
-      priority: "High",
-      createdAt: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(),
-      resolution: null,
-    },
-  ];
+  const complaints: Complaint[] = [];
 
-  const polls: Poll[] = [
-    {
-      id: 1,
-      question: "Should we install CCTV cameras in all common areas?",
-      options: [
-        { id: 1, text: "Yes, strongly agree", votes: 42 },
-        { id: 2, text: "Yes, but only key areas", votes: 28 },
-        { id: 3, text: "No, privacy concern", votes: 8 },
-        { id: 4, text: "Need more discussion", votes: 14 },
-      ],
-      createdBy: "Security Committee",
-      createdAt: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true,
-    },
-    {
-      id: 2,
-      question:
-        "What facility would you prefer for the vacant ground floor space?",
-      options: [
-        { id: 5, text: "Gymnasium / Fitness Center", votes: 55 },
-        { id: 6, text: "Children's Play Area", votes: 32 },
-        { id: 7, text: "Community Library", votes: 18 },
-        { id: 8, text: "Indoor Games Room", votes: 27 },
-      ],
-      createdBy: "Residents Committee",
-      createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-      isActive: true,
-    },
-  ];
+  const polls: Poll[] = [];
 
-  const staff: Staff[] = [
-    {
-      id: 1,
-      name: "Ramesh Gupta",
-      role: "Security Guard",
-      phone: "+91 92345 11111",
-      salary: 14000,
-      joiningDate: "2023-06-01",
-      isActive: true,
-    },
-    {
-      id: 2,
-      name: "Shyam Lal",
-      role: "Security Guard",
-      phone: "+91 92345 22222",
-      salary: 14000,
-      joiningDate: "2022-11-15",
-      isActive: true,
-    },
-    {
-      id: 3,
-      name: "Geeta Devi",
-      role: "Housekeeping",
-      phone: "+91 92345 33333",
-      salary: 11000,
-      joiningDate: "2023-01-10",
-      isActive: true,
-    },
-    {
-      id: 4,
-      name: "Mahesh Yadav",
-      role: "Plumber",
-      phone: "+91 92345 44444",
-      salary: 16000,
-      joiningDate: "2021-09-20",
-      isActive: true,
-    },
-    {
-      id: 5,
-      name: "Raju Electrician",
-      role: "Electrician",
-      phone: "+91 92345 55555",
-      salary: 17000,
-      joiningDate: "2021-07-05",
-      isActive: true,
-    },
-    {
-      id: 6,
-      name: "Suresh Naidu",
-      role: "Gardener",
-      phone: "+91 92345 66666",
-      salary: 10000,
-      joiningDate: "2024-02-01",
-      isActive: true,
-    },
-  ];
-
-  // Build attendance for the current month
-  const today = new Date();
+  const staff: Staff[] = [];
   const attendance: Attendance[] = [];
-  let attendanceId = 1;
-  for (const staffMember of staff) {
-    // Past 7 days of attendance
-    for (let d = 6; d >= 1; d--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - d);
-      const dateStr = date.toISOString().slice(0, 10);
-      const statuses = [
-        "Present",
-        "Present",
-        "Present",
-        "Present",
-        "HalfDay",
-        "Absent",
-        "Present",
-      ];
-      const statusIdx = d % statuses.length;
-      attendance.push({
-        id: attendanceId++,
-        staffId: staffMember.id,
-        date: dateStr,
-        status: statuses[statusIdx],
-      });
-    }
+  const salaryRecords: SalaryRecord[] = [];
+
+  const societies: Society[] = [];
+
+  const expenses: Expense[] = [];
+
+  const vehicles: Vehicle[] = [];
+
+  const amcContracts: AmcContract[] = [];
+
+  function hashPassword(email: string, password: string): string {
+    return btoa(unescape(encodeURIComponent(`${email}:${password}`)));
   }
 
-  const salaryRecords: SalaryRecord[] = [
+  const users: User[] = [
     {
       id: 1,
-      staffId: 1,
-      month: 1,
-      year: CURRENT_YEAR,
-      amount: 14000,
-      paidOn: `${CURRENT_YEAR}-02-01`,
-      status: "Paid",
-    },
-    {
-      id: 2,
-      staffId: 2,
-      month: 1,
-      year: CURRENT_YEAR,
-      amount: 14000,
-      paidOn: `${CURRENT_YEAR}-02-01`,
-      status: "Paid",
-    },
-    {
-      id: 3,
-      staffId: 3,
-      month: 1,
-      year: CURRENT_YEAR,
-      amount: 11000,
-      paidOn: `${CURRENT_YEAR}-02-01`,
-      status: "Paid",
-    },
-    {
-      id: 4,
-      staffId: 4,
-      month: 1,
-      year: CURRENT_YEAR,
-      amount: 16000,
-      paidOn: `${CURRENT_YEAR}-02-01`,
-      status: "Paid",
-    },
-    {
-      id: 5,
-      staffId: 5,
-      month: 1,
-      year: CURRENT_YEAR,
-      amount: 17000,
-      paidOn: `${CURRENT_YEAR}-02-01`,
-      status: "Paid",
-    },
-    {
-      id: 6,
-      staffId: 6,
-      month: 1,
-      year: CURRENT_YEAR,
-      amount: 10000,
-      paidOn: `${CURRENT_YEAR}-02-01`,
-      status: "Paid",
-    },
-    {
-      id: 7,
-      staffId: 1,
-      month: 2,
-      year: CURRENT_YEAR,
-      amount: 14000,
-      paidOn: `${CURRENT_YEAR}-03-01`,
-      status: "Pending",
-    },
-    {
-      id: 8,
-      staffId: 2,
-      month: 2,
-      year: CURRENT_YEAR,
-      amount: 14000,
-      paidOn: `${CURRENT_YEAR}-03-01`,
-      status: "Pending",
-    },
-  ];
-
-  const societies: Society[] = [
-    {
-      id: 1,
-      name: "Prestige Lakeside Habitat",
-      address: "14, Whitefield Main Road",
-      city: "Bengaluru",
-      registrationNumber: "CHS/KA/2021/004512",
-      contactPhone: "+91 98765 43210",
-    },
-  ];
-
-  const expenses: Expense[] = [
-    {
-      id: 101,
-      title: "Pump Room Repair",
-      category: "Repairs",
-      amount: 8500,
-      description:
-        "Replacement of submersible pump motor in basement pump room.",
-      paidTo: "Aqua Tech Services",
-      paidBy: "Admin",
-      date: `${CURRENT_YEAR}-01-15`,
-      paymentMethod: "Cheque",
-      receiptNumber: "AQ/2026/0115",
-      societyId: 1,
-    },
-    {
-      id: 102,
-      title: "Electricity Bill – Common Areas",
-      category: "Utilities",
-      amount: 12400,
-      description:
-        "Monthly electricity bill for lifts, parking lights, lobby, and common corridors.",
-      paidTo: "BESCOM",
-      paidBy: "Admin",
-      date: `${CURRENT_YEAR}-01-20`,
-      paymentMethod: "Bank Transfer",
-      receiptNumber: "BESCOM/JAN26",
-      societyId: 1,
-    },
-    {
-      id: 103,
-      title: "Garden Maintenance",
-      category: "Maintenance",
-      amount: 3200,
-      description:
-        "Monthly charges for garden upkeep, plant trimming, and watering.",
-      paidTo: "GreenLeaf Landscaping",
-      paidBy: "Admin",
-      date: `${CURRENT_YEAR}-01-31`,
-      paymentMethod: "Cash",
-      receiptNumber: "",
-      societyId: 1,
-    },
-    {
-      id: 104,
-      title: "Security Agency Bill – January",
-      category: "Security",
-      amount: 42000,
-      description:
-        "Monthly invoice from security agency for 3 guards (day + night shifts).",
-      paidTo: "Shield Security Services",
-      paidBy: "SuperAdmin",
-      date: `${CURRENT_YEAR}-02-05`,
-      paymentMethod: "Bank Transfer",
-      receiptNumber: "SSS/INV/2026/012",
-      societyId: 1,
-    },
-    {
-      id: 105,
-      title: "Lift AMC – Annual Contract",
-      category: "Maintenance",
-      amount: 18000,
-      description:
-        "Annual maintenance contract for 2 lifts in Tower A and Tower B.",
-      paidTo: "Otis Elevators Pvt Ltd",
-      paidBy: "SuperAdmin",
-      date: `${CURRENT_YEAR}-02-10`,
-      paymentMethod: "Cheque",
-      receiptNumber: "OTIS/AMC/2026",
-      societyId: 1,
-    },
-    {
-      id: 106,
-      title: "Housekeeping Supplies",
-      category: "Cleaning",
-      amount: 2750,
-      description:
-        "Purchase of phenyl, brooms, dustpans, and cleaning chemicals for common areas.",
-      paidTo: "Clean World Supplies",
-      paidBy: "Admin",
-      date: `${CURRENT_YEAR}-02-18`,
-      paymentMethod: "Cash",
-      receiptNumber: "",
-      societyId: 1,
-    },
-  ];
-
-  const vehicles: Vehicle[] = [
-    {
-      id: 151,
-      unitId: 1,
-      unitNumber: "A-101",
-      ownerName: "Rajesh Kumar",
-      vehicleNumber: "KA 01 AB 1234",
-      vehicleType: "Car",
-      brand: "Maruti Swift",
-      color: "White",
-      societyId: 1,
-    },
-    {
-      id: 152,
-      unitId: 1,
-      unitNumber: "A-101",
-      ownerName: "Rajesh Kumar",
-      vehicleNumber: "KA 01 CD 5678",
-      vehicleType: "Bike",
-      brand: "Honda Activa",
-      color: "Black",
-      societyId: 1,
-    },
-    {
-      id: 153,
-      unitId: 2,
-      unitNumber: "A-203",
-      ownerName: "Sunita Sharma",
-      vehicleNumber: "KA 02 EF 9012",
-      vehicleType: "Car",
-      brand: "Hyundai i20",
-      color: "Silver",
-      societyId: 1,
-    },
-    {
-      id: 154,
-      unitId: 3,
-      unitNumber: "A-301",
-      ownerName: "Amit Verma",
-      vehicleNumber: "KA 03 GH 3456",
-      vehicleType: "Car",
-      brand: "Toyota Innova",
-      color: "Grey",
-      societyId: 1,
-    },
-    {
-      id: 155,
-      unitId: 5,
-      unitNumber: "B-102",
-      ownerName: "Vikram Shah",
-      vehicleNumber: "KA 05 IJ 7890",
-      vehicleType: "Car",
-      brand: "Honda City",
-      color: "Blue",
-      societyId: 1,
-    },
-    {
-      id: 156,
-      unitId: 8,
-      unitNumber: "B-401",
-      ownerName: "Meena Pillai",
-      vehicleNumber: "KA 08 KL 1122",
-      vehicleType: "Scooter",
-      brand: "TVS Jupiter",
-      color: "Red",
-      societyId: 1,
-    },
-    {
-      id: 157,
-      unitId: 9,
-      unitNumber: "C-102",
-      ownerName: "Arjun Mehta",
-      vehicleNumber: "KA 09 MN 3344",
-      vehicleType: "Car",
-      brand: "Tata Nexon",
-      color: "Orange",
-      societyId: 1,
-    },
-    {
-      id: 158,
-      unitId: 12,
-      unitNumber: "C-302",
-      ownerName: "Lakshmi Patel",
-      vehicleNumber: "KA 12 OP 5566",
-      vehicleType: "Bike",
-      brand: "Royal Enfield",
-      color: "Black",
-      societyId: 1,
-    },
-  ];
-
-  const amcToday = new Date();
-  const expiringSoonDate = new Date(amcToday);
-  expiringSoonDate.setDate(expiringSoonDate.getDate() + 25);
-  const expiredDate = new Date(amcToday);
-  expiredDate.setDate(expiredDate.getDate() - 30);
-  const futureDate1 = new Date(amcToday);
-  futureDate1.setFullYear(futureDate1.getFullYear() + 1);
-  const futureDate2 = new Date(amcToday);
-  futureDate2.setMonth(futureDate2.getMonth() + 8);
-
-  const amcContracts: AmcContract[] = [
-    {
-      id: 161,
-      equipmentName: "Lift Tower A",
-      vendor: "Otis Elevators Pvt Ltd",
-      contactPerson: "Ramesh Naidu",
-      contactPhone: "+91 98001 11111",
-      contractStart: `${CURRENT_YEAR}-01-01`,
-      contractEnd: futureDate1.toISOString().slice(0, 10),
-      amount: 18000,
-      paymentMethod: "Cheque",
-      notes:
-        "Annual service contract includes 2 scheduled visits + emergency calls",
-      status: "Active",
-      societyId: 1,
-    },
-    {
-      id: 162,
-      equipmentName: "Lift Tower B",
-      vendor: "Otis Elevators Pvt Ltd",
-      contactPerson: "Ramesh Naidu",
-      contactPhone: "+91 98001 11111",
-      contractStart: `${CURRENT_YEAR}-01-01`,
-      contractEnd: expiringSoonDate.toISOString().slice(0, 10),
-      amount: 18000,
-      paymentMethod: "Cheque",
-      notes: "Renewal due soon",
-      status: "Expiring Soon",
-      societyId: 1,
-    },
-    {
-      id: 163,
-      equipmentName: "Water Pump (Submersible)",
-      vendor: "Aqua Tech Services",
-      contactPerson: "Sunil Kamath",
-      contactPhone: "+91 99002 22222",
-      contractStart: `${CURRENT_YEAR - 1}-06-01`,
-      contractEnd: expiredDate.toISOString().slice(0, 10),
-      amount: 8500,
-      paymentMethod: "Bank Transfer",
-      notes: "Expired – renewal pending approval",
-      status: "Expired",
-      societyId: 1,
-    },
-    {
-      id: 164,
-      equipmentName: "Fire Safety Equipment",
-      vendor: "FireSafe India",
-      contactPerson: "Anil Sharma",
-      contactPhone: "+91 97003 33333",
-      contractStart: `${CURRENT_YEAR}-02-01`,
-      contractEnd: futureDate1.toISOString().slice(0, 10),
-      amount: 12000,
-      paymentMethod: "Bank Transfer",
-      notes:
-        "Covers fire extinguisher refilling, hydrant checks, and alarm testing",
-      status: "Active",
-      societyId: 1,
-    },
-    {
-      id: 165,
-      equipmentName: "CCTV System",
-      vendor: "SecureVision Technologies",
-      contactPerson: "Pradeep Menon",
-      contactPhone: "+91 96004 44444",
-      contractStart: `${CURRENT_YEAR}-01-15`,
-      contractEnd: futureDate2.toISOString().slice(0, 10),
-      amount: 6500,
-      paymentMethod: "UPI",
-      notes: "32 cameras – maintenance and DVR backup support",
-      status: "Active",
-      societyId: 1,
-    },
-    {
-      id: 166,
-      equipmentName: "Generator (DG Set)",
-      vendor: "Power Solutions Pvt Ltd",
-      contactPerson: "Mahesh Reddy",
-      contactPhone: "+91 95005 55555",
-      contractStart: `${CURRENT_YEAR - 1}-04-01`,
-      contractEnd: expiringSoonDate.toISOString().slice(0, 10),
-      amount: 15000,
-      paymentMethod: "Cheque",
-      notes: "Quarterly service + fuel top-up not included",
-      status: "Expiring Soon",
-      societyId: 1,
+      name: "Super Admin",
+      email: "admin@society.com",
+      passwordHash: hashPassword("admin@society.com", "admin123"),
+      role: "SuperAdmin",
+      // SuperAdmin has no societyId — global access
+      createdAt: new Date().toISOString(),
     },
   ];
 
   return {
     societyInfo: {
-      name: "Prestige Lakeside Habitat",
-      address: "14, Whitefield Main Road",
-      city: "Bengaluru",
-      registrationNumber: "CHS/KA/2021/004512",
-      contactPhone: "+91 98765 43210",
+      name: "",
+      address: "",
+      city: "",
+      registrationNumber: "",
+      contactPhone: "",
     },
     societies,
-    activeSocietyId: 1,
+    activeSocietyId: 0,
     towers,
     units,
     bills,
@@ -1250,7 +354,9 @@ function buildSeedData(): StoreState {
     expenses,
     vehicles,
     amcContracts,
-    nextId: 200,
+    users,
+    currentUserId: null,
+    nextId: 10,
   };
 }
 
@@ -1273,9 +379,17 @@ function loadFromStorage(): StoreState {
             city: parsed.societyInfo.city,
             registrationNumber: parsed.societyInfo.registrationNumber,
             contactPhone: parsed.societyInfo.contactPhone,
+            isEnabled: true,
           },
         ];
         parsed.activeSocietyId = 1;
+      }
+      // Migrate: ensure isEnabled exists on all societies (default to true)
+      if (parsed.societies) {
+        parsed.societies = parsed.societies.map((soc) => ({
+          ...soc,
+          isEnabled: (soc as any).isEnabled ?? true,
+        }));
       }
       // Migrate towers: ensure societyId exists
       if (parsed.towers) {
@@ -1284,7 +398,7 @@ function loadFromStorage(): StoreState {
           societyId: t.societyId ?? (parsed.activeSocietyId || 1),
         }));
       }
-      // Migrate bills: ensure breakdown/previousDue/grandTotal exist
+      // Migrate bills: ensure breakdown/previousDue/grandTotal/societyId exist
       if (parsed.bills) {
         parsed.bills = parsed.bills.map((b) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1305,10 +419,11 @@ function loadFromStorage(): StoreState {
             previousDue: b.previousDue ?? 0,
             grandTotal: b.grandTotal ?? b.amount,
             breakdown: migratedBreakdown,
+            societyId: b.societyId ?? (parsed.activeSocietyId || 1),
           };
         });
       }
-      // Migrate units: ensure new fields exist
+      // Migrate units: ensure new fields exist and societyId
       if (parsed.units) {
         parsed.units = parsed.units.map((u) => {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1330,8 +445,54 @@ function loadFromStorage(): StoreState {
               interest: bd.interest ?? 0,
             };
           }
+          // Migrate societyId on units
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (u as any).societyId =
+            (u as any).societyId ?? (parsed.activeSocietyId || 1);
           return u;
         });
+      }
+      // Migrate visitors: ensure societyId
+      if (parsed.visitors) {
+        parsed.visitors = parsed.visitors.map((v) => ({
+          ...v,
+          societyId: v.societyId ?? (parsed.activeSocietyId || 1),
+        }));
+      }
+      // Migrate notices: ensure societyId
+      if (parsed.notices) {
+        parsed.notices = parsed.notices.map((n) => ({
+          ...n,
+          societyId: n.societyId ?? (parsed.activeSocietyId || 1),
+        }));
+      }
+      // Migrate complaints: ensure societyId
+      if (parsed.complaints) {
+        parsed.complaints = parsed.complaints.map((c) => ({
+          ...c,
+          societyId: c.societyId ?? (parsed.activeSocietyId || 1),
+        }));
+      }
+      // Migrate polls: ensure societyId
+      if (parsed.polls) {
+        parsed.polls = parsed.polls.map((p) => ({
+          ...p,
+          societyId: p.societyId ?? (parsed.activeSocietyId || 1),
+        }));
+      }
+      // Migrate staff: ensure societyId
+      if (parsed.staff) {
+        parsed.staff = parsed.staff.map((s) => ({
+          ...s,
+          societyId: s.societyId ?? (parsed.activeSocietyId || 1),
+        }));
+      }
+      // Migrate users: assign societyId=1 to all non-SuperAdmin users missing societyId
+      if (parsed.users) {
+        parsed.users = parsed.users.map((u) => ({
+          ...u,
+          societyId: u.societyId ?? (u.role === "SuperAdmin" ? undefined : 1),
+        }));
       }
       // Migrate: ensure expenses array exists
       if (!parsed.expenses) {
@@ -1344,6 +505,14 @@ function loadFromStorage(): StoreState {
       // Migrate: ensure amcContracts array exists
       if (!parsed.amcContracts) {
         parsed.amcContracts = [];
+      }
+      // Migrate: ensure users array exists
+      if (!parsed.users || parsed.users.length === 0) {
+        const seed = buildSeedData();
+        parsed.users = seed.users;
+      }
+      if (parsed.currentUserId === undefined) {
+        parsed.currentUserId = null;
       }
       return parsed;
     }
@@ -1411,11 +580,33 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
         ...s,
         societies: [
           ...s.societies,
-          { id, name, address, city, registrationNumber, contactPhone },
+          {
+            id,
+            name,
+            address,
+            city,
+            registrationNumber,
+            contactPhone,
+            isEnabled: true,
+          },
         ],
         nextId: s.nextId + 1,
       }));
       return id;
+    },
+    toggleSocietyEnabled: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        societies: s.societies.map((soc) =>
+          soc.id === id ? { ...soc, isEnabled: !soc.isEnabled } : soc,
+        ),
+      }));
+    },
+    deleteSociety: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        societies: s.societies.filter((soc) => soc.id !== id),
+      }));
     },
     setActiveSociety: (id: number): void => {
       mutate((s) => {
@@ -1479,7 +670,10 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
     },
 
     // Towers
-    getTowers: (): Tower[] => state.towers,
+    getTowers: (societyId?: number | null): Tower[] =>
+      societyId != null
+        ? state.towers.filter((t) => t.societyId === societyId)
+        : state.towers,
     createTower: (
       name: string,
       totalFloors: number,
@@ -1511,7 +705,10 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
     },
 
     // Units
-    getUnits: (): Unit[] => state.units,
+    getUnits: (societyId?: number | null): Unit[] =>
+      societyId != null
+        ? state.units.filter((u) => u.societyId === societyId)
+        : state.units,
     createUnit: (
       towerId: number,
       unitNumber: string,
@@ -1527,6 +724,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       email?: string,
       memberCount?: number,
       unitType?: string,
+      societyId?: number,
     ): number => {
       const id = state.nextId;
       mutate((s) => ({
@@ -1549,6 +747,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             email,
             memberCount,
             unitType,
+            societyId: societyId ?? s.activeSocietyId,
           },
         ],
         nextId: s.nextId + 1,
@@ -1571,6 +770,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       email?: string,
       memberCount?: number,
       unitType?: string,
+      societyId?: number,
     ): void => {
       mutate((s) => ({
         ...s,
@@ -1592,6 +792,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
                 email,
                 memberCount,
                 unitType,
+                societyId: societyId ?? u.societyId ?? s.activeSocietyId,
               }
             : u,
         ),
@@ -1602,7 +803,10 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
     },
 
     // Bills
-    getBills: (): Bill[] => state.bills,
+    getBills: (societyId?: number | null): Bill[] =>
+      societyId != null
+        ? state.bills.filter((b) => b.societyId === societyId)
+        : state.bills,
     createBill: (
       unitId: number,
       unitNumber: string,
@@ -1611,6 +815,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       dueDate: string,
       month: number,
       year: number,
+      societyId?: number,
     ): number => {
       const id = state.nextId;
       const amount =
@@ -1640,11 +845,41 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             month,
             year,
             status: "Pending",
+            societyId: societyId ?? s.activeSocietyId,
           },
         ],
         nextId: s.nextId + 1,
       }));
       return id;
+    },
+    deleteBill: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        bills: s.bills.filter((b) => b.id !== id),
+        payments: s.payments.filter((p) => p.billId !== id),
+      }));
+    },
+    deleteAllBills: (societyId?: number | null): void => {
+      mutate((s) => {
+        const billIdsToRemove =
+          societyId != null
+            ? new Set(
+                s.bills
+                  .filter((b) => b.societyId === societyId)
+                  .map((b) => b.id),
+              )
+            : null;
+        return {
+          ...s,
+          bills:
+            societyId != null
+              ? s.bills.filter((b) => b.societyId !== societyId)
+              : [],
+          payments: billIdsToRemove
+            ? s.payments.filter((p) => !billIdsToRemove.has(p.billId))
+            : [],
+        };
+      });
     },
     updateBill: (
       id: number,
@@ -1707,9 +942,16 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
         nextId: s.nextId + 1,
       }));
     },
-    getFinancialSummary: (): FinancialSummary => {
-      const totalBilled = state.bills.reduce((sum, b) => sum + b.grandTotal, 0);
-      const totalCollected = state.bills
+    getFinancialSummary: (societyId?: number | null): FinancialSummary => {
+      const filteredBills =
+        societyId != null
+          ? state.bills.filter((b) => b.societyId === societyId)
+          : state.bills;
+      const totalBilled = filteredBills.reduce(
+        (sum, b) => sum + b.grandTotal,
+        0,
+      );
+      const totalCollected = filteredBills
         .filter((b) => b.status === "Paid")
         .reduce((sum, b) => sum + b.grandTotal, 0);
       return {
@@ -1720,9 +962,16 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
     },
 
     // Visitors
-    getVisitors: (): Visitor[] => state.visitors,
-    getActiveVisitors: (): Visitor[] =>
-      state.visitors.filter((v) => v.status === "Active"),
+    getVisitors: (societyId?: number | null): Visitor[] =>
+      societyId != null
+        ? state.visitors.filter((v) => v.societyId === societyId)
+        : state.visitors,
+    getActiveVisitors: (societyId?: number | null): Visitor[] =>
+      state.visitors.filter(
+        (v) =>
+          v.status === "Active" &&
+          (societyId == null || v.societyId === societyId),
+      ),
     registerVisitor: (
       name: string,
       phone: string,
@@ -1730,6 +979,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       hostUnit: string,
       hostUnitId: number,
       checkInTime: string,
+      societyId?: number,
     ): number => {
       const id = state.nextId;
       mutate((s) => ({
@@ -1746,6 +996,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             checkInTime,
             checkOutTime: null,
             status: "Active",
+            societyId: societyId ?? s.activeSocietyId,
           },
         ],
         nextId: s.nextId + 1,
@@ -1760,30 +1011,82 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
         ),
       }));
     },
+    deleteVisitor: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        visitors: s.visitors.filter((v) => v.id !== id),
+      }));
+    },
+    deleteAllVisitors: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        visitors:
+          societyId != null
+            ? s.visitors.filter((v) => v.societyId !== societyId)
+            : [],
+      }));
+    },
 
     // Notices
-    getNotices: (): Notice[] => state.notices,
+    getNotices: (societyId?: number | null): Notice[] =>
+      societyId != null
+        ? state.notices.filter((n) => n.societyId === societyId)
+        : state.notices,
     createNotice: (
       title: string,
       content: string,
       category: string,
       postedBy: string,
       postedAt: string,
+      societyId?: number,
     ): number => {
       const id = state.nextId;
       mutate((s) => ({
         ...s,
         notices: [
           ...s.notices,
-          { id, title, content, category, postedBy, postedAt, isActive: true },
+          {
+            id,
+            title,
+            content,
+            category,
+            postedBy,
+            postedAt,
+            isActive: true,
+            societyId: societyId ?? s.activeSocietyId,
+          },
         ],
         nextId: s.nextId + 1,
       }));
       return id;
     },
 
+    deleteNotice: (id: number): void => {
+      mutate((s) => ({ ...s, notices: s.notices.filter((n) => n.id !== id) }));
+    },
+    toggleNoticeActive: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        notices: s.notices.map((n) =>
+          n.id === id ? { ...n, isActive: !n.isActive } : n,
+        ),
+      }));
+    },
+    deleteAllNotices: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        notices:
+          societyId != null
+            ? s.notices.filter((n) => n.societyId !== societyId)
+            : [],
+      }));
+    },
+
     // Complaints
-    getComplaints: (): Complaint[] => state.complaints,
+    getComplaints: (societyId?: number | null): Complaint[] =>
+      societyId != null
+        ? state.complaints.filter((c) => c.societyId === societyId)
+        : state.complaints,
     createComplaint: (
       title: string,
       description: string,
@@ -1792,6 +1095,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       residentName: string,
       priority: string,
       createdAt: string,
+      societyId?: number,
     ): number => {
       const id = state.nextId;
       mutate((s) => ({
@@ -1809,6 +1113,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             priority,
             createdAt,
             resolution: null,
+            societyId: societyId ?? s.activeSocietyId,
           },
         ],
         nextId: s.nextId + 1,
@@ -1828,13 +1133,33 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       }));
     },
 
+    deleteComplaint: (id: number): void => {
+      mutate((s) => ({
+        ...s,
+        complaints: s.complaints.filter((c) => c.id !== id),
+      }));
+    },
+    deleteAllComplaints: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        complaints:
+          societyId != null
+            ? s.complaints.filter((c) => c.societyId !== societyId)
+            : [],
+      }));
+    },
+
     // Polls
-    getPolls: (): Poll[] => state.polls,
+    getPolls: (societyId?: number | null): Poll[] =>
+      societyId != null
+        ? state.polls.filter((p) => p.societyId === societyId)
+        : state.polls,
     createPoll: (
       question: string,
       options: string[],
       createdBy: string,
       createdAt: string,
+      societyId?: number,
     ): number => {
       const pollId = state.nextId;
       let optId = state.nextId + 1;
@@ -1854,6 +1179,7 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
             createdBy,
             createdAt,
             isActive: true,
+            societyId: societyId ?? s.activeSocietyId,
           },
         ],
         nextId: optId,
@@ -1876,25 +1202,64 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       }));
     },
 
+    deletePoll: (id: number): void => {
+      mutate((s) => ({ ...s, polls: s.polls.filter((p) => p.id !== id) }));
+    },
+    deleteAllPolls: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        polls:
+          societyId != null
+            ? s.polls.filter((p) => p.societyId !== societyId)
+            : [],
+      }));
+    },
+
     // Staff
-    getStaff: (): Staff[] => state.staff,
+    getStaff: (societyId?: number | null): Staff[] =>
+      societyId != null
+        ? state.staff.filter((s) => s.societyId === societyId)
+        : state.staff,
     addStaff: (
       name: string,
       role: string,
       phone: string,
       salary: number,
       joiningDate: string,
+      societyId?: number,
     ): number => {
       const id = state.nextId;
       mutate((s) => ({
         ...s,
         staff: [
           ...s.staff,
-          { id, name, role, phone, salary, joiningDate, isActive: true },
+          {
+            id,
+            name,
+            role,
+            phone,
+            salary,
+            joiningDate,
+            isActive: true,
+            societyId: societyId ?? s.activeSocietyId,
+          },
         ],
         nextId: s.nextId + 1,
       }));
       return id;
+    },
+
+    deleteStaff: (id: number): void => {
+      mutate((s) => ({ ...s, staff: s.staff.filter((st) => st.id !== id) }));
+    },
+    deleteAllStaff: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        staff:
+          societyId != null
+            ? s.staff.filter((st) => st.societyId !== societyId)
+            : [],
+      }));
     },
 
     // Attendance
@@ -1921,6 +1286,15 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       return id;
     },
 
+    deleteAllAttendance: (staffIds?: Set<number>): void => {
+      mutate((s) => ({
+        ...s,
+        attendance: staffIds
+          ? s.attendance.filter((a) => !staffIds.has(a.staffId))
+          : [],
+      }));
+    },
+
     // Salary Records
     getSalaryRecords: (): SalaryRecord[] => state.salaryRecords,
     addSalaryRecord: (
@@ -1943,11 +1317,29 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       return id;
     },
 
+    deleteAllSalaryRecords: (staffIds?: Set<number>): void => {
+      mutate((s) => ({
+        ...s,
+        salaryRecords: staffIds
+          ? s.salaryRecords.filter((r) => !staffIds.has(r.staffId))
+          : [],
+      }));
+    },
+
     // Payments
-    getPayments: (): Payment[] => state.payments,
+    getPayments: (societyId?: number | null): Payment[] => {
+      if (societyId == null) return state.payments;
+      return state.payments.filter((pay) => {
+        const bill = state.bills.find((b) => b.id === pay.billId);
+        return bill?.societyId === societyId;
+      });
+    },
 
     // Expenses
-    getExpenses: (): Expense[] => state.expenses,
+    getExpenses: (societyId?: number | null): Expense[] =>
+      societyId != null
+        ? state.expenses.filter((e) => e.societyId === societyId)
+        : state.expenses,
     createExpense: (
       title: string,
       category: string,
@@ -2023,6 +1415,15 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
         expenses: s.expenses.filter((e) => e.id !== id),
       }));
     },
+    deleteAllExpenses: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        expenses:
+          societyId != null
+            ? s.expenses.filter((e) => e.societyId !== societyId)
+            : [],
+      }));
+    },
 
     // Vehicles
     getVehicles: (): Vehicle[] => state.vehicles,
@@ -2091,6 +1492,15 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
       mutate((s) => ({
         ...s,
         vehicles: s.vehicles.filter((v) => v.id !== id),
+      }));
+    },
+    deleteAllVehicles: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        vehicles:
+          societyId != null
+            ? s.vehicles.filter((v) => v.societyId !== societyId)
+            : [],
       }));
     },
 
@@ -2174,6 +1584,222 @@ function createOps(state: StoreState, setState: (s: StoreState) => void) {
         ...s,
         amcContracts: s.amcContracts.filter((a) => a.id !== id),
       }));
+    },
+    deleteAllAmcContracts: (societyId?: number | null): void => {
+      mutate((s) => ({
+        ...s,
+        amcContracts:
+          societyId != null
+            ? s.amcContracts.filter((a) => a.societyId !== societyId)
+            : [],
+      }));
+    },
+
+    // ── Auth operations ───────────────────────────────────────────────────────
+
+    getUsers: (): User[] => state.users,
+    createAdminUser: (
+      name: string,
+      email: string,
+      password: string,
+      role: AppRole,
+      societyId: number,
+      unitId?: number,
+      unitNumber?: string,
+    ): { success: boolean; error?: string } => {
+      const existingUser = state.users.find(
+        (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
+      );
+      if (existingUser)
+        return {
+          success: false,
+          error: "An account with this email already exists",
+        };
+      const id = state.nextId;
+      const passwordHash = btoa(
+        unescape(
+          encodeURIComponent(`${email.trim().toLowerCase()}:${password}`),
+        ),
+      );
+      const newUser: User = {
+        id,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        passwordHash,
+        role,
+        societyId,
+        unitId,
+        unitNumber,
+        createdAt: new Date().toISOString(),
+      };
+      mutate((s) => ({
+        ...s,
+        users: [...s.users, newUser],
+        nextId: s.nextId + 1,
+      }));
+      return { success: true };
+    },
+    deleteUser: (id: number): void => {
+      mutate((s) => ({ ...s, users: s.users.filter((u) => u.id !== id) }));
+    },
+    updateAdminUser: (
+      id: number,
+      name: string,
+      email: string,
+      role: AppRole,
+      societyId?: number,
+      unitId?: number,
+      unitNumber?: string,
+    ): { success: boolean; error?: string } => {
+      const existingUser = state.users.find(
+        (u) =>
+          u.email.toLowerCase() === email.trim().toLowerCase() && u.id !== id,
+      );
+      if (existingUser) {
+        return {
+          success: false,
+          error: "Another account with this email already exists",
+        };
+      }
+      mutate((s) => ({
+        ...s,
+        users: s.users.map((u) =>
+          u.id === id
+            ? {
+                ...u,
+                name: name.trim(),
+                email: email.trim().toLowerCase(),
+                role,
+                societyId,
+                unitId,
+                unitNumber,
+              }
+            : u,
+        ),
+      }));
+      return { success: true };
+    },
+    getCurrentUser: (): User | null => {
+      if (state.currentUserId === null) return null;
+      return state.users.find((u) => u.id === state.currentUserId) ?? null;
+    },
+    signIn: (
+      email: string,
+      password: string,
+    ): { success: boolean; error?: string; user?: User } => {
+      const hash = btoa(
+        unescape(
+          encodeURIComponent(`${email.trim().toLowerCase()}:${password}`),
+        ),
+      );
+      const user = state.users.find(
+        (u) =>
+          u.email.toLowerCase() === email.trim().toLowerCase() &&
+          u.passwordHash === hash,
+      );
+      if (!user) {
+        return { success: false, error: "Invalid email or password" };
+      }
+      // Block non-SuperAdmin login if their society is inactive
+      if (user.role !== "SuperAdmin" && user.societyId != null) {
+        const society = state.societies.find((s) => s.id === user.societyId);
+        if (society && !society.isEnabled) {
+          return {
+            success: false,
+            error:
+              "Society is currently inactive. Please contact your Super Admin.",
+          };
+        }
+      }
+      mutate((s) => ({ ...s, currentUserId: user.id }));
+      return { success: true, user };
+    },
+    signUp: (
+      name: string,
+      email: string,
+      password: string,
+      role: AppRole,
+      unitId?: number,
+      unitNumber?: string,
+      societyId?: number,
+    ): { success: boolean; error?: string } => {
+      // Admin and SuperAdmin accounts must be created by SuperAdmin
+      if (role === "SuperAdmin" || role === "Admin") {
+        return {
+          success: false,
+          error: "Admin accounts must be created by the Super Admin",
+        };
+      }
+      const existingUser = state.users.find(
+        (u) => u.email.toLowerCase() === email.trim().toLowerCase(),
+      );
+      if (existingUser) {
+        return {
+          success: false,
+          error: "An account with this email already exists",
+        };
+      }
+      const id = state.nextId;
+      const passwordHash = btoa(
+        unescape(
+          encodeURIComponent(`${email.trim().toLowerCase()}:${password}`),
+        ),
+      );
+      const newUser: User = {
+        id,
+        name: name.trim(),
+        email: email.trim().toLowerCase(),
+        passwordHash,
+        role,
+        societyId,
+        unitId,
+        unitNumber,
+        createdAt: new Date().toISOString(),
+      };
+      mutate((s) => ({
+        ...s,
+        users: [...s.users, newUser],
+        currentUserId: id,
+        nextId: s.nextId + 1,
+      }));
+      return { success: true };
+    },
+    signOut: (): void => {
+      mutate((s) => ({ ...s, currentUserId: null }));
+    },
+    updateUserProfile: (id: number, name: string, email: string): void => {
+      mutate((s) => ({
+        ...s,
+        users: s.users.map((u) =>
+          u.id === id
+            ? { ...u, name: name.trim(), email: email.trim().toLowerCase() }
+            : u,
+        ),
+      }));
+    },
+    updateUserPassword: (
+      id: number,
+      currentPassword: string,
+      newPassword: string,
+    ): { success: boolean; error?: string } => {
+      const user = state.users.find((u) => u.id === id);
+      if (!user) return { success: false, error: "User not found" };
+      const currentHash = btoa(
+        unescape(encodeURIComponent(`${user.email}:${currentPassword}`)),
+      );
+      if (user.passwordHash !== currentHash) {
+        return { success: false, error: "Current password is incorrect" };
+      }
+      const newHash = btoa(
+        unescape(encodeURIComponent(`${user.email}:${newPassword}`)),
+      );
+      mutate((s) => ({
+        ...s,
+        users: s.users.map((u) =>
+          u.id === id ? { ...u, passwordHash: newHash } : u,
+        ),
+      }));
+      return { success: true };
     },
 
     // Expose state for hooks to use directly if needed

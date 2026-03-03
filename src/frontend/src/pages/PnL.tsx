@@ -27,7 +27,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import type { AppRole } from "../components/RoleSelection";
+import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
 const MONTH_NAMES = [
@@ -47,11 +47,17 @@ const MONTH_NAMES = [
 
 interface PnLProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function PnL({ role }: PnLProps) {
+export default function PnL({ role, societyId }: PnLProps) {
   const store = useSocietyStore();
-  const canView = role === "SuperAdmin" || role === "Admin";
+  const canView =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   if (!canView) {
     return (
@@ -72,8 +78,8 @@ export default function PnL({ role }: PnLProps) {
     );
   }
 
-  const bills = store.getBills();
-  const expenses = store.getExpenses();
+  const bills = store.getBills(societyId);
+  const expenses = store.getExpenses(societyId);
   const currentYear = new Date().getFullYear();
 
   // Build monthly data for current year

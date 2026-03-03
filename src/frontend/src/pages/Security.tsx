@@ -25,66 +25,64 @@ import {
   Clock,
   LogOut,
   Plus,
+  Trash2,
   UserCheck,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
-// Mock vehicle log data
-const vehicleLog = [
-  {
-    id: 1,
-    vehicleNo: "MH-12-AB-3456",
-    type: "Car",
-    owner: "Priya Singh",
-    unit: "B-203",
-    entryTime: "08:32 AM",
-    exitTime: "—",
-    status: "Inside",
-  },
-  {
-    id: 2,
-    vehicleNo: "MH-12-CD-7890",
-    type: "Motorcycle",
-    owner: "Vikram Shah",
-    unit: "A-405",
-    entryTime: "09:15 AM",
-    exitTime: "11:20 AM",
-    status: "Left",
-  },
-  {
-    id: 3,
-    vehicleNo: "MH-14-EF-2233",
-    type: "Car",
-    owner: "Delivery — Swiggy",
-    unit: "C-102",
-    entryTime: "12:45 PM",
-    exitTime: "01:05 PM",
-    status: "Left",
-  },
-  {
-    id: 4,
-    vehicleNo: "MH-12-GH-5544",
-    type: "Car",
-    owner: "Rajesh Kumar",
-    unit: "A-301",
-    entryTime: "06:10 PM",
-    exitTime: "—",
-    status: "Inside",
-  },
-];
+const VEHICLE_LOG_KEY = "smart_society_vehicle_log";
+
+interface VehicleLogEntry {
+  id: number;
+  vehicleNo: string;
+  type: string;
+  owner: string;
+  unit: string;
+  entryTime: string;
+  exitTime: string;
+  status: string;
+}
+
+function loadVehicleLog(): VehicleLogEntry[] {
+  try {
+    const raw = localStorage.getItem(VEHICLE_LOG_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
+function saveVehicleLog(log: VehicleLogEntry[]) {
+  localStorage.setItem(VEHICLE_LOG_KEY, JSON.stringify(log));
+}
+
+const isAdminRole = (role: AppRole) =>
+  role === "SuperAdmin" ||
+  role === "Admin" ||
+  role === "Chairman" ||
+  role === "Secretary" ||
+  role === "Treasurer";
 
 interface SecurityProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function Security({ role: _role }: SecurityProps) {
+export default function Security({ role, societyId }: SecurityProps) {
   const store = useSocietyStore();
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
+  const [vehicleLog, setVehicleLog] = useState<VehicleLogEntry[]>(() =>
+    loadVehicleLog(),
+  );
+
+  const canDeleteAll = isAdminRole(role);
 
   const [registerOpen, setRegisterOpen] = useState(false);
   const [visitorName, setVisitorName] = useState("");
@@ -92,8 +90,8 @@ export default function Security({ role: _role }: SecurityProps) {
   const [purpose, setPurpose] = useState("");
   const [hostUnit, setHostUnit] = useState("");
 
-  const visitors = store.getVisitors();
-  const units = store.getUnits();
+  const visitors = store.getVisitors(societyId);
+  const units = store.getUnits(societyId);
 
   const handleRegister = () => {
     if (!visitorName || !visitorPhone || !purpose || !hostUnit) return;
@@ -104,6 +102,7 @@ export default function Security({ role: _role }: SecurityProps) {
       hostUnit,
       0,
       new Date().toISOString(),
+      societyId ?? undefined,
     );
     toast.success("Visitor registered successfully");
     setRegisterOpen(false);
@@ -264,6 +263,20 @@ export default function Security({ role: _role }: SecurityProps) {
 
         {/* Visitor Log */}
         <TabsContent value="visitors" className="mt-0">
+          {canDeleteAll && visitors.length > 0 && (
+            <div className="flex justify-end mb-3">
+              <DeleteAllDialog
+                label="Delete All Visitors"
+                description="Are you sure you want to delete all visitor records? This action cannot be undone."
+                onConfirm={() => {
+                  store.deleteAllVisitors(societyId);
+                  toast.success("All visitor records deleted");
+                  refresh();
+                }}
+                ocidScope="visitors"
+              />
+            </div>
+          )}
           <Card>
             <div className="overflow-x-auto">
               <Table>
@@ -387,6 +400,20 @@ export default function Security({ role: _role }: SecurityProps) {
 
         {/* Vehicle Log */}
         <TabsContent value="vehicles" className="mt-0">
+          {canDeleteAll && vehicleLog.length > 0 && (
+            <div className="flex justify-end mb-3">
+              <DeleteAllDialog
+                label="Delete All Vehicle Log"
+                description="Are you sure you want to delete all vehicle log entries? This action cannot be undone."
+                onConfirm={() => {
+                  setVehicleLog([]);
+                  saveVehicleLog([]);
+                  toast.success("All vehicle log entries deleted");
+                }}
+                ocidScope="vehicle_log"
+              />
+            </div>
+          )}
           <Card>
             <div className="overflow-x-auto">
               <Table>
@@ -413,54 +440,90 @@ export default function Security({ role: _role }: SecurityProps) {
                     <TableHead className="font-body font-semibold">
                       Status
                     </TableHead>
+                    {canDeleteAll && (
+                      <TableHead className="font-body font-semibold">
+                        Actions
+                      </TableHead>
+                    )}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {vehicleLog.map((v) => (
-                    <TableRow
-                      key={v.id}
-                      className={v.status === "Inside" ? "bg-blue-50/50" : ""}
-                    >
-                      <TableCell className="font-display font-semibold text-sm">
-                        {v.vehicleNo}
-                      </TableCell>
-                      <TableCell className="font-body text-sm">
-                        {v.type}
-                      </TableCell>
-                      <TableCell className="font-body text-sm">
-                        {v.owner}
-                      </TableCell>
-                      <TableCell className="font-display font-medium text-sm">
-                        {v.unit}
-                      </TableCell>
-                      <TableCell className="font-body text-sm">
-                        {v.entryTime}
-                      </TableCell>
-                      <TableCell className="font-body text-sm">
-                        {v.exitTime}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          className="font-body text-xs"
-                          style={
-                            v.status === "Inside"
-                              ? {
-                                  background: "oklch(0.92 0.06 240)",
-                                  color: "oklch(0.35 0.15 243)",
-                                  border: "1px solid oklch(0.84 0.1 240)",
-                                }
-                              : {
-                                  background: "oklch(0.92 0.015 245)",
-                                  color: "oklch(0.45 0.03 248)",
-                                  border: "1px solid oklch(0.84 0.02 245)",
-                                }
-                          }
-                        >
-                          {v.status}
-                        </Badge>
+                  {vehicleLog.length === 0 ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={canDeleteAll ? 8 : 7}
+                        className="text-center py-12 font-body text-muted-foreground"
+                      >
+                        No vehicle log entries.
                       </TableCell>
                     </TableRow>
-                  ))}
+                  ) : (
+                    vehicleLog.map((v) => (
+                      <TableRow
+                        key={v.id}
+                        className={v.status === "Inside" ? "bg-blue-50/50" : ""}
+                      >
+                        <TableCell className="font-display font-semibold text-sm">
+                          {v.vehicleNo}
+                        </TableCell>
+                        <TableCell className="font-body text-sm">
+                          {v.type}
+                        </TableCell>
+                        <TableCell className="font-body text-sm">
+                          {v.owner}
+                        </TableCell>
+                        <TableCell className="font-display font-medium text-sm">
+                          {v.unit}
+                        </TableCell>
+                        <TableCell className="font-body text-sm">
+                          {v.entryTime}
+                        </TableCell>
+                        <TableCell className="font-body text-sm">
+                          {v.exitTime}
+                        </TableCell>
+                        <TableCell>
+                          <Badge
+                            className="font-body text-xs"
+                            style={
+                              v.status === "Inside"
+                                ? {
+                                    background: "oklch(0.92 0.06 240)",
+                                    color: "oklch(0.35 0.15 243)",
+                                    border: "1px solid oklch(0.84 0.1 240)",
+                                  }
+                                : {
+                                    background: "oklch(0.92 0.015 245)",
+                                    color: "oklch(0.45 0.03 248)",
+                                    border: "1px solid oklch(0.84 0.02 245)",
+                                  }
+                            }
+                          >
+                            {v.status}
+                          </Badge>
+                        </TableCell>
+                        {canDeleteAll && (
+                          <TableCell>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                              data-ocid="vehicle_log.delete_button"
+                              onClick={() => {
+                                const updated = vehicleLog.filter(
+                                  (x) => x.id !== v.id,
+                                );
+                                setVehicleLog(updated);
+                                saveVehicleLog(updated);
+                                toast.success("Vehicle log entry deleted");
+                              }}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          </TableCell>
+                        )}
+                      </TableRow>
+                    ))
+                  )}
                 </TableBody>
               </Table>
             </div>

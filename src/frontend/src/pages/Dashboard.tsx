@@ -14,11 +14,12 @@ import {
   Users,
 } from "lucide-react";
 import { motion } from "motion/react";
-import type { AppRole } from "../components/RoleSelection";
+import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
 interface DashboardProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
 interface KpiCardProps {
@@ -93,64 +94,35 @@ function KpiCard({
   );
 }
 
-const activityFeed = [
-  {
-    id: 1,
-    type: "visitor",
-    message: "Rajesh Kumar registered as visitor for A-401",
-    time: "5 min ago",
-    icon: <UserCheck className="w-3.5 h-3.5" />,
-    color: "oklch(0.52 0.18 243)",
-  },
-  {
-    id: 2,
-    type: "payment",
-    message: "Maintenance bill paid by Priya Singh (B-203)",
-    time: "23 min ago",
-    icon: <CheckCircle2 className="w-3.5 h-3.5" />,
-    color: "oklch(0.58 0.16 155)",
-  },
-  {
-    id: 3,
-    type: "complaint",
-    message: "Water leakage complaint filed by unit C-105",
-    time: "1 hr ago",
-    icon: <AlertCircle className="w-3.5 h-3.5" />,
-    color: "oklch(0.62 0.2 25)",
-  },
-  {
-    id: 4,
-    type: "notice",
-    message: "General body meeting notice posted by admin",
-    time: "2 hr ago",
-    icon: <Activity className="w-3.5 h-3.5" />,
-    color: "oklch(0.65 0.15 195)",
-  },
-  {
-    id: 5,
-    type: "staff",
-    message: "Attendance marked for 8 staff members",
-    time: "3 hr ago",
-    icon: <Users className="w-3.5 h-3.5" />,
-    color: "oklch(0.72 0.12 95)",
-  },
-];
+const activityFeed: {
+  id: number;
+  type: string;
+  message: string;
+  time: string;
+  icon: React.ReactNode;
+  color: string;
+}[] = [];
 
-export default function Dashboard({ role }: DashboardProps) {
+export default function Dashboard({ role, societyId }: DashboardProps) {
   const store = useSocietyStore();
 
-  const towers = store.getTowers();
-  const units = store.getUnits();
-  const activeVisitors = store.getActiveVisitors();
-  const complaints = store.getComplaints();
-  const financialSummary = store.getFinancialSummary();
+  const towers = store.getTowers(societyId);
+  const units = store.getUnits(societyId);
+  const activeVisitors = store.getActiveVisitors(societyId);
+  const complaints = store.getComplaints(societyId);
+  const financialSummary = store.getFinancialSummary(societyId);
 
   const totalUnits = units.length;
   const occupiedUnits = units.filter((u) => u.isOccupied).length;
   const openComplaints = complaints.filter((c) => c.status === "Open").length;
   const pendingDues = financialSummary.pendingDues;
 
-  const isAdmin = role === "SuperAdmin" || role === "Admin";
+  const isAdmin =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -259,30 +231,42 @@ export default function Dashboard({ role }: DashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-1 pb-4">
-            {activityFeed.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: -8 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: index * 0.06 }}
-                className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
-              >
-                <div
-                  className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-white"
-                  style={{ background: item.color }}
+            {activityFeed.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 text-center">
+                <Activity className="w-8 h-8 text-muted-foreground/40 mb-2" />
+                <p className="text-sm font-body text-muted-foreground">
+                  No recent activity
+                </p>
+                <p className="text-xs font-body text-muted-foreground/60 mt-0.5">
+                  Activity will appear here as events occur
+                </p>
+              </div>
+            ) : (
+              activityFeed.map((item, index) => (
+                <motion.div
+                  key={item.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: index * 0.06 }}
+                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-accent/50 transition-colors"
                 >
-                  {item.icon}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-body text-foreground leading-snug">
-                    {item.message}
-                  </p>
-                </div>
-                <span className="text-xs font-body text-muted-foreground flex-shrink-0 mt-0.5">
-                  {item.time}
-                </span>
-              </motion.div>
-            ))}
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-white"
+                    style={{ background: item.color }}
+                  >
+                    {item.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-body text-foreground leading-snug">
+                      {item.message}
+                    </p>
+                  </div>
+                  <span className="text-xs font-body text-muted-foreground flex-shrink-0 mt-0.5">
+                    {item.time}
+                  </span>
+                </motion.div>
+              ))
+            )}
           </CardContent>
         </Card>
 

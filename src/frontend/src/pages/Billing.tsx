@@ -37,6 +37,7 @@ import {
   IndianRupee,
   Plus,
   Receipt,
+  Trash2,
   TrendingUp,
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -51,7 +52,9 @@ import {
   YAxis,
 } from "recharts";
 import { toast } from "sonner";
-import type { AppRole } from "../components/RoleSelection";
+import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import { useAuth } from "../store/AuthContext";
+import type { AppRole } from "../store/societyStore";
 import type { Bill, Payment, SocietyInfo } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
@@ -1096,6 +1099,7 @@ function EditBillDialog({
 
 function ResidentBillingView() {
   const store = useSocietyStore();
+  const { currentUser } = useAuth();
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
 
@@ -1106,8 +1110,14 @@ function ResidentBillingView() {
   const societyInfo = store.getSocietyInfo();
   const allUnits = store.getUnits();
 
-  // Resident only sees their own unit bills (A-101 = Rajesh Kumar demo unit)
-  const myBills = allBills.filter((b) => b.unitNumber === "A-101");
+  // Resident only sees their own unit bills; fall back to "A-101" for demo
+  const residentUnitNumber = currentUser?.unitNumber ?? "A-101";
+  const residentUnitId = currentUser?.unitId;
+  const myBills = allBills.filter((b) =>
+    residentUnitId
+      ? b.unitId === residentUnitId
+      : b.unitNumber === residentUnitNumber,
+  );
 
   const pendingCount = myBills.filter((b) => b.status !== "Paid").length;
   const paidCount = myBills.filter((b) => b.status === "Paid").length;
@@ -1176,7 +1186,7 @@ function ResidentBillingView() {
               className="w-4 h-4"
               style={{ color: "oklch(0.52 0.18 243)" }}
             />
-            My Maintenance Bills — Unit A-101
+            My Maintenance Bills — Unit {residentUnitNumber}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -1466,9 +1476,10 @@ function ResidentBillingView() {
 
 interface BillingProps {
   role: AppRole;
+  societyId?: number | null;
 }
 
-export default function Billing({ role }: BillingProps) {
+export default function Billing({ role, societyId }: BillingProps) {
   const store = useSocietyStore();
   const [, setVersion] = useState(0);
   const refresh = () => setVersion((v) => v + 1);
@@ -1517,9 +1528,9 @@ export default function Billing({ role }: BillingProps) {
   const [payAmount, setPayAmount] = useState("");
   const [payMethod, setPayMethod] = useState("Online");
 
-  const bills = store.getBills();
-  const units = store.getUnits();
-  const financialSummary = store.getFinancialSummary();
+  const bills = store.getBills(societyId);
+  const units = store.getUnits(societyId);
+  const financialSummary = store.getFinancialSummary(societyId);
 
   const resetGenerateForm = () => {
     setBillUnitId("");
@@ -1565,6 +1576,7 @@ export default function Billing({ role }: BillingProps) {
       billDueDate,
       Number(billMonth),
       Number(billYear),
+      societyId ?? undefined,
     );
     toast.success("Bill generated successfully");
     setGenerateOpen(false);
@@ -1597,7 +1609,12 @@ export default function Billing({ role }: BillingProps) {
     };
   });
 
-  const isAdmin = role === "SuperAdmin" || role === "Admin";
+  const isAdmin =
+    role === "SuperAdmin" ||
+    role === "Admin" ||
+    role === "Chairman" ||
+    role === "Secretary" ||
+    role === "Treasurer";
 
   // Resident gets their own filtered view
   if (role === "Resident") {
@@ -1621,7 +1638,19 @@ export default function Billing({ role }: BillingProps) {
 
         {/* Bills Tab */}
         <TabsContent value="bills" className="mt-0">
-          <div className="flex justify-end mb-4 gap-2">
+          <div className="flex justify-end mb-4 gap-2 flex-wrap">
+            {isAdmin && bills.length > 0 && (
+              <DeleteAllDialog
+                label="Delete All Bills"
+                description="Are you sure you want to delete all bills? This will also remove all associated payment records. This action cannot be undone."
+                onConfirm={() => {
+                  store.deleteAllBills(societyId);
+                  toast.success("All bills deleted");
+                  refresh();
+                }}
+                ocidScope="bills"
+              />
+            )}
             {isAdmin && (
               <Dialog
                 open={generateOpen}
@@ -2031,6 +2060,7 @@ export default function Billing({ role }: BillingProps) {
                                 style={{ color: "oklch(0.52 0.18 243)" }}
                                 onClick={() => setEditingBill(bill)}
                                 title="Edit bill"
+                                data-ocid="billing.bill.edit_button"
                               >
                                 <Edit2 className="w-3.5 h-3.5" />
                               </Button>
@@ -2048,6 +2078,27 @@ export default function Billing({ role }: BillingProps) {
                                   Record Pay
                                 </Button>
                               )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-7 w-7"
+                                style={{ color: "oklch(0.55 0.18 25)" }}
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Delete bill for ${bill.unitNumber} (${months[bill.month - 1]?.slice(0, 3)} ${bill.year})? This cannot be undone.`,
+                                    )
+                                  ) {
+                                    store.deleteBill(bill.id);
+                                    toast.success("Bill deleted");
+                                    refresh();
+                                  }
+                                }}
+                                title="Delete bill"
+                                data-ocid="billing.bill.delete_button"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
                             </div>
                           </TableCell>
                         )}
