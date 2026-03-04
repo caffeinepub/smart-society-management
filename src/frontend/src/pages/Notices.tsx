@@ -1,3 +1,4 @@
+import type { Notice as BackendNotice } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Bell,
@@ -28,9 +30,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import { useActor } from "../hooks/useActor";
 import type { AppRole } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
@@ -86,8 +88,7 @@ interface NoticesProps {
 
 export default function Notices({ role }: NoticesProps) {
   const store = useSocietyStore();
-  const [, setVersion] = useState(0);
-  const refresh = () => setVersion((v) => v + 1);
+  const { actor, isFetching: actorFetching } = useActor();
 
   const isAdmin =
     role === "SuperAdmin" ||
@@ -103,7 +104,27 @@ export default function Notices({ role }: NoticesProps) {
   const [search, setSearch] = useState("");
   const [filterCategory, setFilterCategory] = useState("All");
 
-  const allNotices = store.getNotices();
+  // Backend notices state
+  const [allNotices, setAllNotices] = useState<BackendNotice[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchNotices = useCallback(async () => {
+    if (!actor) return;
+    try {
+      const data = await actor.getNotices();
+      setAllNotices(data);
+    } catch {
+      toast.error("Failed to load notices.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actor]);
+
+  useEffect(() => {
+    if (!actorFetching && actor) {
+      fetchNotices();
+    }
+  }, [actor, actorFetching, fetchNotices]);
 
   const filtered = allNotices.filter((n) => {
     const matchSearch =
@@ -114,20 +135,24 @@ export default function Notices({ role }: NoticesProps) {
     return matchSearch && matchCat;
   });
 
-  const handleCreateNotice = () => {
-    if (!noticeTitle || !noticeContent) return;
-    store.createNotice(
-      noticeTitle,
-      noticeContent,
-      noticeCategory,
-      "Admin",
-      new Date().toISOString(),
-    );
-    toast.success("Notice posted");
-    setNoticeOpen(false);
-    setNoticeTitle("");
-    setNoticeContent("");
-    refresh();
+  const handleCreateNotice = async () => {
+    if (!noticeTitle || !noticeContent || !actor) return;
+    try {
+      await actor.createNotice(
+        noticeTitle,
+        noticeContent,
+        noticeCategory,
+        "Admin",
+        new Date().toISOString(),
+      );
+      toast.success("Notice posted");
+      setNoticeOpen(false);
+      setNoticeTitle("");
+      setNoticeContent("");
+      await fetchNotices();
+    } catch {
+      toast.error("Failed to post notice. Please try again.");
+    }
   };
 
   return (
@@ -142,18 +167,6 @@ export default function Notices({ role }: NoticesProps) {
         </div>
         {isAdmin && (
           <div className="flex items-center gap-2 flex-wrap">
-            {allNotices.length > 0 && (
-              <DeleteAllDialog
-                label="Delete All Notices"
-                description="Are you sure you want to delete all notices? This action cannot be undone."
-                onConfirm={() => {
-                  store.deleteAllNotices();
-                  toast.success("All notices deleted");
-                  refresh();
-                }}
-                ocidScope="notices"
-              />
-            )}
             <Dialog open={noticeOpen} onOpenChange={setNoticeOpen}>
               <DialogTrigger asChild>
                 <Button
@@ -324,9 +337,30 @@ export default function Notices({ role }: NoticesProps) {
       </Card>
 
       {/* Notices Grid */}
-      {filtered.length === 0 ? (
+      {isLoading ? (
+        <div
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+          data-ocid="notices.loading_state"
+        >
+          {[1, 2, 3].map((i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-5 w-20 mb-1" />
+                <Skeleton className="h-5 w-full" />
+              </CardHeader>
+              <CardContent className="pt-0 space-y-2">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
         <Card>
-          <CardContent className="py-16 text-center">
+          <CardContent
+            className="py-16 text-center"
+            data-ocid="notices.empty_state"
+          >
             <Bell className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
             <p className="font-display font-semibold">
               {allNotices.length === 0
@@ -356,6 +390,7 @@ export default function Notices({ role }: NoticesProps) {
               >
                 <Card
                   className={`h-full hover:shadow-md transition-shadow ${!notice.isActive ? "opacity-60 border-dashed" : ""}`}
+                  data-ocid={`notices.item.${i + 1}`}
                 >
                   <CardHeader className="pb-2">
                     <div className="flex items-start justify-between gap-2">
@@ -392,13 +427,13 @@ export default function Notices({ role }: NoticesProps) {
                               data-ocid={`notices.toggle.${i + 1}`}
                               className="p-1 rounded hover:bg-accent transition-colors"
                               onClick={() => {
-                                store.toggleNoticeActive(notice.id);
+                                store.toggleNoticeActive(Number(notice.id));
                                 toast.success(
                                   notice.isActive
                                     ? "Notice disabled"
                                     : "Notice enabled",
                                 );
-                                refresh();
+                                fetchNotices();
                               }}
                             >
                               {notice.isActive ? (
@@ -413,9 +448,9 @@ export default function Notices({ role }: NoticesProps) {
                               data-ocid={`notices.delete_button.${i + 1}`}
                               className="p-1 rounded hover:bg-red-50 text-red-500 hover:text-red-700 transition-colors"
                               onClick={() => {
-                                store.deleteNotice(notice.id);
+                                store.deleteNotice(Number(notice.id));
                                 toast.success("Notice deleted");
-                                refresh();
+                                fetchNotices();
                               }}
                             >
                               <Trash2 className="w-3.5 h-3.5" />

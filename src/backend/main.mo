@@ -3,14 +3,17 @@ import Iter "mo:core/Iter";
 import Order "mo:core/Order";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
+import List "mo:core/List";
 import Text "mo:core/Text";
 import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
-import List "mo:core/List";
+import Int "mo:core/Int";
 import Principal "mo:core/Principal";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
+import Migration "migration";
 
+(with migration = Migration.run)
 actor {
   // Access control state
   let accessControlState = AccessControl.initState();
@@ -43,7 +46,19 @@ actor {
   };
 
   // BILLING Module Types
-  type Bill = {
+  public type BillBreakdown = {
+    serviceCharges : Nat;
+    nonOccupancyCharges : Nat;
+    liftMaintenance : Nat;
+    parkingCharges : Nat;
+    sinkingFund : Nat;
+    otherCharges : Nat;
+    houseTax : Nat;
+    repairMaintenance : Nat;
+    interest : Nat;
+  };
+
+  public type Bill = {
     id : Nat;
     unitId : Nat;
     unitNumber : Text;
@@ -52,6 +67,10 @@ actor {
     month : Nat;
     year : Nat;
     status : Text; // Pending, Paid, Overdue
+    previousDue : Nat;
+    grandTotal : Nat;
+    breakdown : BillBreakdown;
+    societyId : Nat;
   };
 
   type Payment = {
@@ -355,6 +374,10 @@ actor {
     dueDate : Text,
     month : Nat,
     year : Nat,
+    previousDue : Nat,
+    grandTotal : Nat,
+    societyId : Nat,
+    breakdown : BillBreakdown,
   ) : async Nat {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can create bills");
@@ -369,6 +392,10 @@ actor {
       month;
       year;
       status = "Pending";
+      previousDue;
+      grandTotal;
+      breakdown;
+      societyId;
     };
     bills.add(nextBillId, bill);
     let id = nextBillId;
@@ -376,29 +403,77 @@ actor {
     id;
   };
 
+  public shared ({ caller }) func updateBill(
+    id : Nat,
+    unitId : Nat,
+    unitNumber : Text,
+    amount : Nat,
+    dueDate : Text,
+    month : Nat,
+    year : Nat,
+    previousDue : Nat,
+    grandTotal : Nat,
+    societyId : Nat,
+    breakdown : BillBreakdown,
+    status : Text,
+  ) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can update bills");
+    };
+
+    switch (bills.get(id)) {
+      case (?_) {
+        let updatedBill : Bill = {
+          id;
+          unitId;
+          unitNumber;
+          amount;
+          dueDate;
+          month;
+          year;
+          previousDue;
+          grandTotal;
+          breakdown;
+          status;
+          societyId;
+        };
+        bills.add(id, updatedBill);
+      };
+      case (null) {
+        Runtime.trap("Bill not found");
+      };
+    };
+  };
+
   public shared ({ caller }) func recordPayment(billId : Nat, amount : Nat, paymentMethod : Text) : async () {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
       Runtime.trap("Unauthorized: Only users can record payments");
     };
 
-    // Verify bill exists and user owns the unit
+    // Verify bill exists
     switch (bills.get(billId)) {
       case (?bill) {
-        if (not AccessControl.isAdmin(accessControlState, caller) and not isUnitOwner(caller, bill.unitId)) {
-          Runtime.trap("Unauthorized: Can only pay bills for your own unit");
+        // Verify user owns the unit (admins can pay any bill)
+        if (not AccessControl.isAdmin(accessControlState, caller)) {
+          if (not isUnitOwner(caller, bill.unitId)) {
+            Runtime.trap("Unauthorized: Can only pay bills for your own unit");
+          };
         };
 
         let payment : Payment = {
           id = nextPaymentId;
           billId;
           amount;
-          paidAt = Int.toText(Time.now());
+          paidAt = Time.now().toText();
           paymentMethod;
         };
         payments.add(nextPaymentId, payment);
 
         // Update bill status
-        let updatedBill : Bill = { bill with status = "Paid" };
+        let updatedBill : Bill = {
+          bill with
+          status = "Paid";
+        };
         bills.add(billId, updatedBill);
 
         nextPaymentId += 1;
@@ -423,6 +498,25 @@ actor {
           isUnitOwner(caller, bill.unitId);
         }
       );
+    };
+  };
+
+  public shared ({ caller }) func deleteBill(id : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can delete bills");
+    };
+
+    bills.remove(id);
+  };
+
+  public shared ({ caller }) func deleteAllBills() : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can delete all bills");
+    };
+
+    // Remove all entries from the bills map
+    for ((key, _) in bills.entries()) {
+      bills.remove(key);
     };
   };
 

@@ -1,3 +1,4 @@
+import type { Complaint as BackendComplaint } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -17,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -34,11 +36,10 @@ import {
   Plus,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import { useActor } from "../hooks/useActor";
 import type { AppRole } from "../store/societyStore";
-import { useSocietyStore } from "../store/societyStore";
 
 const complaintCategories = [
   "Plumbing",
@@ -82,16 +83,17 @@ interface ComplaintsProps {
 }
 
 export default function Complaints({ role }: ComplaintsProps) {
-  const store = useSocietyStore();
-  const [, setVersion] = useState(0);
-  const refresh = () => setVersion((v) => v + 1);
-
+  const { actor, isFetching: actorFetching } = useActor();
   const isAdmin =
     role === "SuperAdmin" ||
     role === "Admin" ||
     role === "Chairman" ||
     role === "Secretary" ||
     role === "Treasurer";
+
+  // Backend complaint state
+  const [allComplaints, setAllComplaints] = useState<BackendComplaint[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   // File complaint form
   const [complaintOpen, setComplaintOpen] = useState(false);
@@ -103,7 +105,7 @@ export default function Complaints({ role }: ComplaintsProps) {
   const [complaintPriority, setComplaintPriority] = useState("Medium");
 
   // Status update form
-  const [updateId, setUpdateId] = useState<number | null>(null);
+  const [updateId, setUpdateId] = useState<bigint | null>(null);
   const [newStatus, setNewStatus] = useState("InProgress");
   const [resolution, setResolution] = useState("");
   const [updateOpen, setUpdateOpen] = useState(false);
@@ -113,7 +115,23 @@ export default function Complaints({ role }: ComplaintsProps) {
   const [filterCategory, setFilterCategory] = useState("All");
   const [search, setSearch] = useState("");
 
-  const allComplaints = store.getComplaints();
+  const fetchComplaints = useCallback(async () => {
+    if (!actor) return;
+    try {
+      const data = await actor.getComplaints();
+      setAllComplaints(data);
+    } catch {
+      toast.error("Failed to load complaints.");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actor]);
+
+  useEffect(() => {
+    if (!actorFetching && actor) {
+      fetchComplaints();
+    }
+  }, [actor, actorFetching, fetchComplaints]);
 
   const filtered = allComplaints.filter((c) => {
     const matchStatus = filterStatus === "All" || c.status === filterStatus;
@@ -134,34 +152,46 @@ export default function Complaints({ role }: ComplaintsProps) {
     (c) => c.status === "Resolved",
   ).length;
 
-  const handleCreateComplaint = () => {
-    if (!complaintTitle || !complaintUnit || !complaintName) return;
-    store.createComplaint(
-      complaintTitle,
-      complaintDesc,
-      complaintCategory,
-      complaintUnit,
-      complaintName,
-      complaintPriority,
-      new Date().toISOString(),
-    );
-    toast.success("Complaint filed");
-    setComplaintOpen(false);
-    setComplaintTitle("");
-    setComplaintDesc("");
-    setComplaintUnit("");
-    setComplaintName("");
-    refresh();
+  const handleCreateComplaint = async () => {
+    if (!complaintTitle || !complaintUnit || !complaintName || !actor) return;
+    try {
+      await actor.createComplaint(
+        complaintTitle,
+        complaintDesc,
+        complaintCategory,
+        complaintUnit,
+        complaintName,
+        complaintPriority,
+        new Date().toISOString(),
+      );
+      toast.success("Complaint filed");
+      setComplaintOpen(false);
+      setComplaintTitle("");
+      setComplaintDesc("");
+      setComplaintUnit("");
+      setComplaintName("");
+      await fetchComplaints();
+    } catch {
+      toast.error("Failed to file complaint. Please try again.");
+    }
   };
 
-  const handleUpdateComplaint = () => {
-    if (updateId === null) return;
-    store.updateComplaintStatus(updateId, newStatus, resolution || null);
-    toast.success("Complaint status updated");
-    setUpdateOpen(false);
-    setUpdateId(null);
-    setResolution("");
-    refresh();
+  const handleUpdateComplaint = async () => {
+    if (updateId === null || !actor) return;
+    try {
+      await actor.updateComplaintStatus(
+        updateId,
+        newStatus,
+        resolution || null,
+      );
+      toast.success("Complaint status updated");
+      setUpdateOpen(false);
+      setUpdateId(null);
+      setResolution("");
+      await fetchComplaints();
+    } catch {
+      toast.error("Failed to update complaint status.");
+    }
   };
 
   return (
@@ -175,18 +205,7 @@ export default function Complaints({ role }: ComplaintsProps) {
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          {isAdmin && allComplaints.length > 0 && (
-            <DeleteAllDialog
-              label="Delete All Complaints"
-              description="Are you sure you want to delete all complaints? This action cannot be undone."
-              onConfirm={() => {
-                store.deleteAllComplaints();
-                toast.success("All complaints deleted");
-                refresh();
-              }}
-              ocidScope="complaints"
-            />
-          )}
+          {/* Delete All hidden — backend has no deleteAll API */}
           <Dialog open={complaintOpen} onOpenChange={setComplaintOpen}>
             <DialogTrigger asChild>
               <Button
@@ -481,11 +500,26 @@ export default function Complaints({ role }: ComplaintsProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell
+                      colSpan={isAdmin ? 8 : 7}
+                      className="py-8"
+                      data-ocid="complaints.loading_state"
+                    >
+                      <div className="space-y-2 px-4">
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                        <Skeleton className="h-8 w-full" />
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={isAdmin ? 8 : 7}
                       className="text-center py-12 font-body text-muted-foreground"
+                      data-ocid="complaints.empty_state"
                     >
                       {allComplaints.length === 0
                         ? "No complaints filed yet"
@@ -499,8 +533,11 @@ export default function Complaints({ role }: ComplaintsProps) {
                         new Date(b.createdAt).getTime() -
                         new Date(a.createdAt).getTime(),
                     )
-                    .map((c) => (
-                      <TableRow key={c.id.toString()}>
+                    .map((c, idx) => (
+                      <TableRow
+                        key={c.id.toString()}
+                        data-ocid={`complaints.item.${idx + 1}`}
+                      >
                         <TableCell className="font-display font-semibold text-sm max-w-48">
                           <div className="truncate">{c.title}</div>
                           {c.resolution && (
@@ -573,6 +610,7 @@ export default function Complaints({ role }: ComplaintsProps) {
                                     setResolution("");
                                     setUpdateOpen(true);
                                   }}
+                                  data-ocid={`complaints.edit_button.${idx + 1}`}
                                 >
                                   Update
                                 </Button>

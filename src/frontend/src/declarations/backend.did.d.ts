@@ -20,11 +20,26 @@ export interface Bill {
   'id' : bigint,
   'status' : string,
   'month' : bigint,
+  'societyId' : bigint,
+  'breakdown' : BillBreakdown,
   'year' : bigint,
   'dueDate' : string,
   'unitId' : bigint,
+  'grandTotal' : bigint,
   'unitNumber' : string,
+  'previousDue' : bigint,
   'amount' : bigint,
+}
+export interface BillBreakdown {
+  'nonOccupancyCharges' : bigint,
+  'interest' : bigint,
+  'repairMaintenance' : bigint,
+  'serviceCharges' : bigint,
+  'otherCharges' : bigint,
+  'houseTax' : bigint,
+  'liftMaintenance' : bigint,
+  'sinkingFund' : bigint,
+  'parkingCharges' : bigint,
 }
 export interface Complaint {
   'id' : bigint,
@@ -127,7 +142,18 @@ export interface _SERVICE {
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
   'checkOutVisitor' : ActorMethod<[bigint, string], undefined>,
   'createBill' : ActorMethod<
-    [bigint, string, bigint, string, bigint, bigint],
+    [
+      bigint,
+      string,
+      bigint,
+      string,
+      bigint,
+      bigint,
+      bigint,
+      bigint,
+      bigint,
+      BillBreakdown,
+    ],
     bigint
   >,
   'createComplaint' : ActorMethod<
@@ -144,6 +170,8 @@ export interface _SERVICE {
     [bigint, string, bigint, string, [] | [Principal], boolean, bigint],
     bigint
   >,
+  'deleteAllBills' : ActorMethod<[], undefined>,
+  'deleteBill' : ActorMethod<[bigint], undefined>,
   'deleteTower' : ActorMethod<[bigint], undefined>,
   'deleteUnit' : ActorMethod<[bigint], undefined>,
   'getActiveVisitors' : ActorMethod<[], Array<Visitor>>,
@@ -170,6 +198,23 @@ export interface _SERVICE {
     bigint
   >,
   'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  'updateBill' : ActorMethod<
+    [
+      bigint,
+      bigint,
+      string,
+      bigint,
+      string,
+      bigint,
+      bigint,
+      bigint,
+      bigint,
+      bigint,
+      BillBreakdown,
+      string,
+    ],
+    undefined
+  >,
   'updateComplaintStatus' : ActorMethod<
     [bigint, string, [] | [string]],
     undefined
