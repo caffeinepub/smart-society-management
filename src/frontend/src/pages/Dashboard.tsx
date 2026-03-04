@@ -1,21 +1,21 @@
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Activity,
   AlertCircle,
   Building2,
-  CheckCircle2,
   Clock,
   Home,
   Receipt,
   TrendingDown,
   TrendingUp,
   UserCheck,
-  Users,
 } from "lucide-react";
 import { motion } from "motion/react";
+import { useEffect, useState } from "react";
+import { useActor } from "../hooks/useActor";
 import type { AppRole } from "../store/societyStore";
-import { useSocietyStore } from "../store/societyStore";
 
 interface DashboardProps {
   role: AppRole;
@@ -94,6 +94,21 @@ function KpiCard({
   );
 }
 
+function KpiCardSkeleton() {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between mb-3">
+          <Skeleton className="h-4 w-28" />
+          <Skeleton className="w-9 h-9 rounded-lg" />
+        </div>
+        <Skeleton className="h-8 w-16 mb-2" />
+        <Skeleton className="h-3 w-24" />
+      </CardContent>
+    </Card>
+  );
+}
+
 const activityFeed: {
   id: number;
   type: string;
@@ -103,19 +118,34 @@ const activityFeed: {
   color: string;
 }[] = [];
 
-export default function Dashboard({ role, societyId }: DashboardProps) {
-  const store = useSocietyStore();
+interface DashboardData {
+  towersCount: number;
+  totalUnits: number;
+  occupiedUnits: number;
+  openComplaints: number;
+  totalComplaints: number;
+  resolvedComplaints: number;
+  activeVisitorsCount: number;
+  pendingDues: number;
+  totalBilled: number;
+  totalCollected: number;
+}
 
-  const towers = store.getTowers(societyId);
-  const units = store.getUnits(societyId);
-  const activeVisitors = store.getActiveVisitors(societyId);
-  const complaints = store.getComplaints(societyId);
-  const financialSummary = store.getFinancialSummary(societyId);
-
-  const totalUnits = units.length;
-  const occupiedUnits = units.filter((u) => u.isOccupied).length;
-  const openComplaints = complaints.filter((c) => c.status === "Open").length;
-  const pendingDues = financialSummary.pendingDues;
+export default function Dashboard({ role }: DashboardProps) {
+  const { actor, isFetching: actorFetching } = useActor();
+  const [data, setData] = useState<DashboardData>({
+    towersCount: 0,
+    totalUnits: 0,
+    occupiedUnits: 0,
+    openComplaints: 0,
+    totalComplaints: 0,
+    resolvedComplaints: 0,
+    activeVisitorsCount: 0,
+    pendingDues: 0,
+    totalBilled: 0,
+    totalCollected: 0,
+  });
+  const [isLoading, setIsLoading] = useState(true);
 
   const isAdmin =
     role === "SuperAdmin" ||
@@ -123,6 +153,84 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
     role === "Chairman" ||
     role === "Secretary" ||
     role === "Treasurer";
+
+  useEffect(() => {
+    if (!actor || actorFetching) return;
+
+    async function fetchDashboardData() {
+      if (!actor) return;
+      setIsLoading(true);
+      try {
+        if (isAdmin) {
+          // Run all admin queries in parallel
+          const [towers, units, visitors, complaints, financialSummary] =
+            await Promise.all([
+              actor.getTowers().catch(() => []),
+              actor.getUnits().catch(() => []),
+              actor.getActiveVisitors().catch(() => []),
+              actor.getComplaints().catch(() => []),
+              actor.getFinancialSummary().catch(() => ({
+                pendingDues: BigInt(0),
+                totalBilled: BigInt(0),
+                totalCollected: BigInt(0),
+              })),
+            ]);
+
+          setData({
+            towersCount: towers.length,
+            totalUnits: units.length,
+            occupiedUnits: units.filter((u) => u.isOccupied).length,
+            openComplaints: complaints.filter((c) => c.status === "Open")
+              .length,
+            totalComplaints: complaints.length,
+            resolvedComplaints: complaints.filter(
+              (c) => c.status === "Resolved",
+            ).length,
+            activeVisitorsCount: visitors.length,
+            pendingDues: Number(financialSummary.pendingDues),
+            totalBilled: Number(financialSummary.totalBilled),
+            totalCollected: Number(financialSummary.totalCollected),
+          });
+        } else if (role === "SecurityGuard") {
+          const visitors = await actor.getActiveVisitors().catch(() => []);
+          setData((prev) => ({
+            ...prev,
+            activeVisitorsCount: visitors.length,
+          }));
+        } else if (role === "Resident") {
+          const complaints = await actor.getComplaints().catch(() => []);
+          setData((prev) => ({
+            ...prev,
+            openComplaints: complaints.filter((c) => c.status === "Open")
+              .length,
+            totalComplaints: complaints.length,
+            resolvedComplaints: complaints.filter(
+              (c) => c.status === "Resolved",
+            ).length,
+          }));
+        }
+      } catch {
+        // Silently fail — show zeros
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    fetchDashboardData();
+  }, [actor, actorFetching, isAdmin, role]);
+
+  const occupancyPct =
+    data.totalUnits > 0
+      ? Math.round((data.occupiedUnits / data.totalUnits) * 100)
+      : 0;
+  const collectionPct =
+    data.totalBilled > 0
+      ? Math.round((data.totalCollected / data.totalBilled) * 100)
+      : 0;
+  const resolutionPct =
+    data.totalComplaints > 0
+      ? Math.round((data.resolvedComplaints / data.totalComplaints) * 100)
+      : 0;
 
   return (
     <div className="space-y-6 max-w-7xl">
@@ -153,68 +261,87 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {isAdmin && (
+        {isLoading ? (
           <>
-            <KpiCard
-              title="Total Towers"
-              value={towers.length}
-              subtitle="Residential blocks"
-              icon={<Building2 className="w-4.5 h-4.5" />}
-              color="oklch(0.52 0.18 243)"
-            />
-            <KpiCard
-              title="Total Units"
-              value={totalUnits}
-              subtitle={`${occupiedUnits} occupied`}
-              icon={<Home className="w-4.5 h-4.5" />}
-              trend="up"
-              trendValue={`${totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0}% occupied`}
-              color="oklch(0.58 0.16 155)"
-            />
-            <KpiCard
-              title="Pending Dues"
-              value={`₹${pendingDues.toLocaleString("en-IN")}`}
-              subtitle="Outstanding maintenance"
-              icon={<Receipt className="w-4.5 h-4.5" />}
-              trend={pendingDues > 0 ? "down" : "neutral"}
-              trendValue={pendingDues > 0 ? "Needs attention" : "All clear"}
-              color="oklch(0.62 0.2 25)"
-            />
-            <KpiCard
-              title="Open Complaints"
-              value={openComplaints}
-              subtitle="Pending resolution"
-              icon={<AlertCircle className="w-4.5 h-4.5" />}
-              color="oklch(0.65 0.15 195)"
-            />
+            {isAdmin ? (
+              <>
+                <KpiCardSkeleton />
+                <KpiCardSkeleton />
+                <KpiCardSkeleton />
+                <KpiCardSkeleton />
+              </>
+            ) : (
+              <KpiCardSkeleton />
+            )}
           </>
-        )}
-        {role === "SecurityGuard" && (
-          <KpiCard
-            title="Active Visitors"
-            value={activeVisitors.length}
-            subtitle="Currently inside"
-            icon={<UserCheck className="w-4.5 h-4.5" />}
-            color="oklch(0.52 0.18 243)"
-          />
-        )}
-        {role === "Resident" && (
-          <KpiCard
-            title="Open Complaints"
-            value={openComplaints}
-            subtitle="My pending complaints"
-            icon={<AlertCircle className="w-4.5 h-4.5" />}
-            color="oklch(0.62 0.2 25)"
-          />
-        )}
-        {role === "Staff" && (
-          <KpiCard
-            title="My Attendance"
-            value="Present"
-            subtitle="Today's status"
-            icon={<UserCheck className="w-4.5 h-4.5" />}
-            color="oklch(0.58 0.16 155)"
-          />
+        ) : (
+          <>
+            {isAdmin && (
+              <>
+                <KpiCard
+                  title="Total Towers"
+                  value={data.towersCount}
+                  subtitle="Residential blocks"
+                  icon={<Building2 className="w-4.5 h-4.5" />}
+                  color="oklch(0.52 0.18 243)"
+                />
+                <KpiCard
+                  title="Total Units"
+                  value={data.totalUnits}
+                  subtitle={`${data.occupiedUnits} occupied`}
+                  icon={<Home className="w-4.5 h-4.5" />}
+                  trend="up"
+                  trendValue={`${occupancyPct}% occupied`}
+                  color="oklch(0.58 0.16 155)"
+                />
+                <KpiCard
+                  title="Pending Dues"
+                  value={`₹${data.pendingDues.toLocaleString("en-IN")}`}
+                  subtitle="Outstanding maintenance"
+                  icon={<Receipt className="w-4.5 h-4.5" />}
+                  trend={data.pendingDues > 0 ? "down" : "neutral"}
+                  trendValue={
+                    data.pendingDues > 0 ? "Needs attention" : "All clear"
+                  }
+                  color="oklch(0.62 0.2 25)"
+                />
+                <KpiCard
+                  title="Open Complaints"
+                  value={data.openComplaints}
+                  subtitle="Pending resolution"
+                  icon={<AlertCircle className="w-4.5 h-4.5" />}
+                  color="oklch(0.65 0.15 195)"
+                />
+              </>
+            )}
+            {role === "SecurityGuard" && (
+              <KpiCard
+                title="Active Visitors"
+                value={data.activeVisitorsCount}
+                subtitle="Currently inside"
+                icon={<UserCheck className="w-4.5 h-4.5" />}
+                color="oklch(0.52 0.18 243)"
+              />
+            )}
+            {role === "Resident" && (
+              <KpiCard
+                title="Open Complaints"
+                value={data.openComplaints}
+                subtitle="My pending complaints"
+                icon={<AlertCircle className="w-4.5 h-4.5" />}
+                color="oklch(0.62 0.2 25)"
+              />
+            )}
+            {role === "Staff" && (
+              <KpiCard
+                title="My Attendance"
+                value="Present"
+                subtitle="Today's status"
+                icon={<UserCheck className="w-4.5 h-4.5" />}
+                color="oklch(0.58 0.16 155)"
+              />
+            )}
+          </>
         )}
       </div>
 
@@ -282,19 +409,14 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4 pb-5">
-            {isAdmin && (
+            {isAdmin && !isLoading && (
               <>
                 <div>
                   <div className="flex justify-between text-sm font-body mb-1.5">
                     <span className="text-muted-foreground">
                       Occupancy Rate
                     </span>
-                    <span className="font-semibold">
-                      {totalUnits > 0
-                        ? Math.round((occupiedUnits / totalUnits) * 100)
-                        : 0}
-                      %
-                    </span>
+                    <span className="font-semibold">{occupancyPct}%</span>
                   </div>
                   <div
                     className="h-2 rounded-full overflow-hidden"
@@ -304,9 +426,7 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
                       className="h-full rounded-full"
                       style={{ background: "oklch(0.58 0.16 155)" }}
                       initial={{ width: 0 }}
-                      animate={{
-                        width: `${totalUnits > 0 ? Math.round((occupiedUnits / totalUnits) * 100) : 0}%`,
-                      }}
+                      animate={{ width: `${occupancyPct}%` }}
                       transition={{ duration: 0.8, delay: 0.2 }}
                     />
                   </div>
@@ -317,16 +437,7 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
                     <span className="text-muted-foreground">
                       Bill Collection
                     </span>
-                    <span className="font-semibold">
-                      {financialSummary.totalBilled > 0
-                        ? Math.round(
-                            (financialSummary.totalCollected /
-                              financialSummary.totalBilled) *
-                              100,
-                          )
-                        : 0}
-                      %
-                    </span>
+                    <span className="font-semibold">{collectionPct}%</span>
                   </div>
                   <div
                     className="h-2 rounded-full overflow-hidden"
@@ -336,9 +447,7 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
                       className="h-full rounded-full"
                       style={{ background: "oklch(0.52 0.18 243)" }}
                       initial={{ width: 0 }}
-                      animate={{
-                        width: `${financialSummary.totalBilled > 0 ? Math.round((financialSummary.totalCollected / financialSummary.totalBilled) * 100) : 0}%`,
-                      }}
+                      animate={{ width: `${collectionPct}%` }}
                       transition={{ duration: 0.8, delay: 0.3 }}
                     />
                   </div>
@@ -349,17 +458,7 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
                     <span className="text-muted-foreground">
                       Complaint Resolution
                     </span>
-                    <span className="font-semibold">
-                      {complaints.length > 0
-                        ? Math.round(
-                            (complaints.filter((c) => c.status === "Resolved")
-                              .length /
-                              complaints.length) *
-                              100,
-                          )
-                        : 0}
-                      %
-                    </span>
+                    <span className="font-semibold">{resolutionPct}%</span>
                   </div>
                   <div
                     className="h-2 rounded-full overflow-hidden"
@@ -369,9 +468,7 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
                       className="h-full rounded-full"
                       style={{ background: "oklch(0.65 0.15 195)" }}
                       initial={{ width: 0 }}
-                      animate={{
-                        width: `${complaints.length > 0 ? Math.round((complaints.filter((c) => c.status === "Resolved").length / complaints.length) * 100) : 0}%`,
-                      }}
+                      animate={{ width: `${resolutionPct}%` }}
                       transition={{ duration: 0.8, delay: 0.4 }}
                     />
                   </div>
@@ -379,7 +476,33 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
               </>
             )}
 
-            {/* Visitor count for security */}
+            {isAdmin && isLoading && (
+              <>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between">
+                    <Skeleton className="h-4 w-28" />
+                    <Skeleton className="h-4 w-8" />
+                  </div>
+                  <Skeleton className="h-2 w-full rounded-full" />
+                </div>
+              </>
+            )}
+
+            {/* Visitor count */}
             <div
               className="rounded-xl p-4"
               style={{ background: "oklch(0.94 0.012 245)" }}
@@ -389,24 +512,30 @@ export default function Dashboard({ role, societyId }: DashboardProps) {
                   <p className="text-xs font-body text-muted-foreground uppercase tracking-wide mb-1">
                     Active Visitors
                   </p>
-                  <p className="font-display text-2xl font-bold">
-                    {activeVisitors.length}
-                  </p>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-10" />
+                  ) : (
+                    <p className="font-display text-2xl font-bold">
+                      {data.activeVisitorsCount}
+                    </p>
+                  )}
                 </div>
-                <Badge
-                  className="font-body text-xs"
-                  style={
-                    activeVisitors.length > 0
-                      ? {
-                          background: "oklch(0.9 0.08 155)",
-                          color: "oklch(0.3 0.1 155)",
-                          border: "1px solid oklch(0.82 0.1 155)",
-                        }
-                      : {}
-                  }
-                >
-                  {activeVisitors.length > 0 ? "Inside" : "None"}
-                </Badge>
+                {!isLoading && (
+                  <Badge
+                    className="font-body text-xs"
+                    style={
+                      data.activeVisitorsCount > 0
+                        ? {
+                            background: "oklch(0.9 0.08 155)",
+                            color: "oklch(0.3 0.1 155)",
+                            border: "1px solid oklch(0.82 0.1 155)",
+                          }
+                        : {}
+                    }
+                  >
+                    {data.activeVisitorsCount > 0 ? "Inside" : "None"}
+                  </Badge>
+                )}
               </div>
             </div>
           </CardContent>

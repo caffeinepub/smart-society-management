@@ -1,19 +1,13 @@
 import Array "mo:core/Array";
-import Iter "mo:core/Iter";
-import Order "mo:core/Order";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
-import List "mo:core/List";
-import Text "mo:core/Text";
 import Runtime "mo:core/Runtime";
+import Text "mo:core/Text";
 import Time "mo:core/Time";
-import Int "mo:core/Int";
 import Principal "mo:core/Principal";
 import AccessControl "authorization/access-control";
 import MixinAuthorization "authorization/MixinAuthorization";
-import Migration "migration";
 
-(with migration = Migration.run)
 actor {
   // Access control state
   let accessControlState = AccessControl.initState();
@@ -25,13 +19,23 @@ actor {
     unitId : ?Nat; // Optional unit association
   };
 
-  let userProfiles = Map.empty<Principal, UserProfile>();
-
   // PROPERTIES Module Types
   type Tower = {
     id : Nat;
     name : Text;
     totalFloors : Nat;
+  };
+
+  public type UnitBreakdown = {
+    serviceCharges : Nat;
+    nonOccupancyCharges : Nat;
+    liftMaintenance : Nat;
+    parkingCharges : Nat;
+    sinkingFund : Nat;
+    otherCharges : Nat;
+    houseTax : Nat;
+    repairMaintenance : Nat;
+    interest : Nat;
   };
 
   type Unit = {
@@ -43,6 +47,14 @@ actor {
     ownerId : ?Principal; // Link to user
     isOccupied : Bool;
     monthlyMaintenance : Nat;
+    area : ?Nat;
+    unitType : ?Text;
+    ownershipType : ?Text;
+    phone : ?Text;
+    email : ?Text;
+    memberCount : ?Nat;
+    maintenanceBreakdown : ?UnitBreakdown;
+    previousDue : Nat;
   };
 
   // BILLING Module Types
@@ -178,6 +190,7 @@ actor {
   };
 
   // State Variables
+  let userProfiles = Map.empty<Principal, UserProfile>();
   let towers = Map.empty<Nat, Tower>();
   let units = Map.empty<Nat, Unit>();
   let bills = Map.empty<Nat, Bill>();
@@ -203,6 +216,24 @@ actor {
   var nextStaffId = 0;
   var nextAttendanceId = 0;
   var nextSalaryRecordId = 0;
+
+  // EXPENSES Module (New)
+  public type Expense = {
+    id : Nat;
+    title : Text;
+    category : Text;
+    amount : Nat;
+    description : Text;
+    paidTo : Text;
+    paidBy : Text;
+    date : Text;
+    paymentMethod : Text;
+    receiptNumber : Text;
+    societyId : Nat;
+  };
+
+  let expenses = Map.empty<Nat, Expense>();
+  var nextExpenseId = 0;
 
   // Helper function to get unit owner
   func getUnitOwner(unitId : Nat) : ?Principal {
@@ -297,6 +328,14 @@ actor {
     ownerId : ?Principal,
     isOccupied : Bool,
     monthlyMaintenance : Nat,
+    area : ?Nat,
+    unitType : ?Text,
+    ownershipType : ?Text,
+    phone : ?Text,
+    email : ?Text,
+    memberCount : ?Nat,
+    maintenanceBreakdown : ?UnitBreakdown,
+    previousDue : Nat,
   ) : async Nat {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can create units");
@@ -311,6 +350,14 @@ actor {
       ownerId;
       isOccupied;
       monthlyMaintenance;
+      area;
+      unitType;
+      ownershipType;
+      phone;
+      email;
+      memberCount;
+      maintenanceBreakdown;
+      previousDue;
     };
     units.add(nextUnitId, unit);
     let id = nextUnitId;
@@ -327,6 +374,14 @@ actor {
     ownerId : ?Principal,
     isOccupied : Bool,
     monthlyMaintenance : Nat,
+    area : ?Nat,
+    unitType : ?Text,
+    ownershipType : ?Text,
+    phone : ?Text,
+    email : ?Text,
+    memberCount : ?Nat,
+    maintenanceBreakdown : ?UnitBreakdown,
+    previousDue : Nat,
   ) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can update units");
@@ -343,6 +398,14 @@ actor {
           ownerId;
           isOccupied;
           monthlyMaintenance;
+          area;
+          unitType;
+          ownershipType;
+          phone;
+          email;
+          memberCount;
+          maintenanceBreakdown;
+          previousDue;
         };
         units.add(id, updatedUnit);
       };
@@ -960,6 +1023,113 @@ actor {
       city;
       registrationNumber;
       contactPhone;
+    };
+  };
+
+  // EXPENSES MODULE (NEW)
+
+  public shared ({ caller }) func createExpense(
+    title : Text,
+    category : Text,
+    amount : Nat,
+    description : Text,
+    paidTo : Text,
+    paidBy : Text,
+    date : Text,
+    paymentMethod : Text,
+    receiptNumber : Text,
+    societyId : Nat,
+  ) : async Nat {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can create expenses");
+    };
+
+    let expense : Expense = {
+      id = nextExpenseId;
+      title;
+      category;
+      amount;
+      description;
+      paidTo;
+      paidBy;
+      date;
+      paymentMethod;
+      receiptNumber;
+      societyId;
+    };
+    expenses.add(nextExpenseId, expense);
+    let id = nextExpenseId;
+    nextExpenseId += 1;
+    id;
+  };
+
+  public query ({ caller }) func getExpenses() : async [Expense] {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can view expenses");
+    };
+
+    expenses.values().toArray();
+  };
+
+  public shared ({ caller }) func updateExpense(
+    id : Nat,
+    title : Text,
+    category : Text,
+    amount : Nat,
+    description : Text,
+    paidTo : Text,
+    paidBy : Text,
+    date : Text,
+    paymentMethod : Text,
+    receiptNumber : Text,
+    societyId : Nat,
+  ) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can update expenses");
+    };
+
+    switch (expenses.get(id)) {
+      case (?_) {
+        let updatedExpense : Expense = {
+          id;
+          title;
+          category;
+          amount;
+          description;
+          paidTo;
+          paidBy;
+          date;
+          paymentMethod;
+          receiptNumber;
+          societyId;
+        };
+        expenses.add(id, updatedExpense);
+      };
+      case (null) {
+        Runtime.trap("Expense not found");
+      };
+    };
+  };
+
+  public shared ({ caller }) func deleteExpense(id : Nat) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can delete expenses");
+    };
+
+    if (expenses.containsKey(id)) {
+      expenses.remove(id);
+    } else {
+      Runtime.trap("Expense not found");
+    };
+  };
+
+  public shared ({ caller }) func deleteAllExpenses() : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can delete all expenses");
+    };
+
+    for ((key, _) in expenses.entries()) {
+      expenses.remove(key);
     };
   };
 };

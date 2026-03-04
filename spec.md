@@ -1,37 +1,34 @@
 # Smart Society Management
 
 ## Current State
-- All Billing data (bills, payments) is stored in browser localStorage via `societyStore.ts`
-- The Resident billing view was previously partially wired to the Motoko backend (uses `actor.getBills()`, `actor.recordPayment()`, `actor.getSocietyInfo()`)
-- The Admin/SuperAdmin billing view still uses `useSocietyStore()` for all CRUD (createBill, updateBill, deleteBill, deleteAllBills, recordPayment, getFinancialSummary)
-- The backend `Bill` type only has: id, unitId, unitNumber, amount, dueDate, month, year, status
-- The frontend `Bill` type includes full maintenance breakdown (9 fields), previousDue, grandTotal, societyId
-- Properties data (towers, units) is still in localStorage
+
+- **Settings page** already contains 4 tabs: "Societies", "Society Info", "User Management", "My Profile" -- all under a single Settings page in the sidebar.
+- **Dashboard** reads all KPIs (towers, units, visitors, complaints, financialSummary) entirely from `useSocietyStore` (localStorage).
+- **Expenses** module (Admin/SuperAdmin only) reads and writes all expense data entirely from `useSocietyStore` (localStorage).
+- **Billing**, **Properties**, and **Resident experience** (Notices, Complaints) have already been partially migrated to the Motoko backend in prior sessions.
+- The Motoko backend (`main.mo`) has functions: `getTowers`, `getUnits`, `getBills`, `getFinancialSummary`, `getActiveVisitors`, `getComplaints` -- but **no expense-related functions** exist yet.
 
 ## Requested Changes (Diff)
 
 ### Add
-- Extended `Bill` type in `main.mo` with all breakdown fields: serviceCharges, nonOccupancyCharges, liftMaintenance, parkingCharges, sinkingFund, otherCharges, houseTax, repairMaintenance, interest, previousDue, grandTotal, societyId
-- `updateBill` function in `main.mo` to support editing existing bills
-- `deleteBill(id)` function in `main.mo`
-- `deleteAllBills()` function in `main.mo`
-- Updated `backend.d.ts` to reflect all new Bill fields and functions
+- Backend Motoko functions for Expenses: `createExpense`, `getExpenses`, `updateExpense`, `deleteExpense`, `deleteAllExpenses` with Expense type including: id, title, category, amount, description, paidTo, paidBy, date, paymentMethod, receiptNumber, societyId.
+- Dashboard frontend reads KPI data from Motoko backend (towers count, units count, financial summary, active visitors count, complaints count) while falling back gracefully to 0 if backend calls fail.
+- Dashboard shows a loading skeleton while fetching backend data.
 
 ### Modify
-- `Billing.tsx` admin view: replace all `store.createBill / updateBill / deleteBill / deleteAllBills / recordPayment / getBills / getFinancialSummary` calls with backend actor calls
-- `Billing.tsx` resident view: already uses backend, ensure it still works with updated Bill type
-- Admin billing form: wire to `actor.createBill(...)` with all breakdown fields
-- Edit bill dialog: wire to `actor.updateBill(...)`
-- Record payment: wire to `actor.recordPayment(...)`
-- Delete bill: wire to `actor.deleteBill(...)`
-- Delete all bills: wire to `actor.deleteAllBills()`
-- Financial summary KPIs: wire to `actor.getFinancialSummary()`
+- **Dashboard.tsx**: Replace `useSocietyStore` KPI data calls with Motoko `backend` API calls (`getTowers`, `getUnits`, `getFinancialSummary`, `getActiveVisitors`, `getComplaints`). The activityFeed static array remains as-is (empty).
+- **Expenses.tsx**: Replace all `useSocietyStore` expense calls with Motoko `backend` API calls (`getExpenses`, `createExpense`, `updateExpense`, `deleteExpense`, `deleteAllExpenses`). Loading and error states are required.
+- **Settings.tsx**: No structural changes -- Society, Society Info, and User Management are already tabs inside Settings. Confirm no extra sidebar navigation items are added for these. The tab labels and order should be: Societies → Society Info → User Management → My Profile (for SuperAdmin), or Societies → Society Info → My Profile (for Admin/committee roles).
 
 ### Remove
-- No modules removed
+- Dashboard's dependency on `useSocietyStore` for KPI data (towers, units, financialSummary, activeVisitors, complaints).
+- Expenses' dependency on `useSocietyStore` for all expense CRUD operations.
 
 ## Implementation Plan
-1. Update `main.mo`: extend Bill type with 9 breakdown fields + previousDue + grandTotal + societyId; add updateBill, deleteBill, deleteAllBills functions
-2. Update `backend.d.ts`: add all new fields and function signatures
-3. Update `Billing.tsx`: replace localStorage calls with actor calls for admin view; add loading/error states; keep resident view working
-4. Ensure units list for bill generation comes from `actor.getUnits()` (already available in backend)
+
+1. **Backend (main.mo)**: Add `Expense` type and all 5 expense functions (`createExpense`, `getExpenses`, `updateExpense`, `deleteExpense`, `deleteAllExpenses`). societyId is stored on each expense but current backend uses a single-canister model so societyId is accepted as a parameter for future-proofing.
+2. **backend.d.ts**: Add `Expense` interface and the 5 new expense function signatures.
+3. **Dashboard.tsx**: Wire to backend using `useEffect` + `backend.*` calls. Show loading skeleton on KPI cards while fetching. Graceful fallback to 0 on error.
+4. **Expenses.tsx**: Migrate all CRUD to backend. Remove societyStore import for expenses. Show loading state on mount, error state on failure.
+5. **Settings.tsx**: No changes needed -- tabs are already correct. Confirm Society / Society Info / User Management remain under Settings tabs only (not as separate sidebar items).
+6. Build and deploy.

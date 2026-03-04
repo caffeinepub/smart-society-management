@@ -17,6 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -36,7 +37,7 @@ import {
   Wallet,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -50,9 +51,27 @@ import {
 } from "recharts";
 import { toast } from "sonner";
 import { DeleteAllDialog } from "../components/DeleteAllDialog";
+import { useActor } from "../hooks/useActor";
 import type { AppRole } from "../store/societyStore";
-import type { Expense } from "../store/societyStore";
-import { useSocietyStore } from "../store/societyStore";
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+// Local expense type mapped from backend.Expense (with number instead of bigint)
+interface LocalExpense {
+  id: number;
+  title: string;
+  category: string;
+  amount: number;
+  description: string;
+  paidTo: string;
+  paidBy: string;
+  date: string;
+  paymentMethod: string;
+  receiptNumber: string;
+  societyId: number;
+}
+
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const EXPENSE_CATEGORIES = [
   "Maintenance",
@@ -87,6 +106,8 @@ function getCategoryStyle(category: string) {
   };
 }
 
+// ─── Form types ───────────────────────────────────────────────────────────────
+
 interface ExpenseFormData {
   title: string;
   category: string;
@@ -109,10 +130,13 @@ const defaultForm: ExpenseFormData = {
   receiptNumber: "",
 };
 
+// ─── Expense Dialog ───────────────────────────────────────────────────────────
+
 interface ExpenseDialogProps {
   open: boolean;
-  editingExpense: Expense | null;
+  editingExpense: LocalExpense | null;
   onClose: () => void;
+  onSaved: () => void;
   societyId?: number | null;
 }
 
@@ -120,11 +144,10 @@ function ExpenseDialog({
   open,
   editingExpense,
   onClose,
-  societyId: propSocietyId,
+  onSaved,
+  societyId,
 }: ExpenseDialogProps) {
-  const store = useSocietyStore();
-  const societyId = propSocietyId ?? store.getActiveSocietyId();
-
+  const { actor } = useActor();
   const [form, setFormState] = useState<ExpenseFormData>(() =>
     editingExpense
       ? {
@@ -139,11 +162,12 @@ function ExpenseDialog({
         }
       : defaultForm,
   );
+  const [isSaving, setIsSaving] = useState(false);
 
   // Re-init when editingExpense changes
-  const [lastEditing, setLastEditing] = useState<number | null>(null);
-  if (editingExpense && editingExpense.id !== lastEditing) {
-    setLastEditing(editingExpense.id);
+  const [lastEditingId, setLastEditingId] = useState<number | null>(null);
+  if (editingExpense && editingExpense.id !== lastEditingId) {
+    setLastEditingId(editingExpense.id);
     setFormState({
       title: editingExpense.title,
       category: editingExpense.category,
@@ -155,8 +179,8 @@ function ExpenseDialog({
       receiptNumber: editingExpense.receiptNumber,
     });
   }
-  if (!editingExpense && lastEditing !== null) {
-    setLastEditing(null);
+  if (!editingExpense && lastEditingId !== null) {
+    setLastEditingId(null);
     setFormState(defaultForm);
   }
 
@@ -170,40 +194,49 @@ function ExpenseDialog({
     form.paidTo.trim() &&
     form.date;
 
-  const handleSave = () => {
-    if (!isValid) return;
-    if (editingExpense) {
-      store.updateExpense(
-        editingExpense.id,
-        form.title.trim(),
-        form.category,
-        Number(form.amount),
-        form.description.trim(),
-        form.paidTo.trim(),
-        editingExpense.paidBy,
-        form.date,
-        form.paymentMethod,
-        form.receiptNumber.trim(),
-        societyId,
-      );
-      toast.success("Expense updated");
-    } else {
-      store.createExpense(
-        form.title.trim(),
-        form.category,
-        Number(form.amount),
-        form.description.trim(),
-        form.paidTo.trim(),
-        "Admin",
-        form.date,
-        form.paymentMethod,
-        form.receiptNumber.trim(),
-        societyId,
-      );
-      toast.success("Expense recorded");
+  const handleSave = async () => {
+    if (!isValid || isSaving || !actor) return;
+    setIsSaving(true);
+    try {
+      if (editingExpense) {
+        await actor.updateExpense(
+          BigInt(editingExpense.id),
+          form.title.trim(),
+          form.category,
+          BigInt(Math.round(Number(form.amount))),
+          form.description.trim(),
+          form.paidTo.trim(),
+          editingExpense.paidBy || "Admin",
+          form.date,
+          form.paymentMethod,
+          form.receiptNumber.trim(),
+          BigInt(societyId ?? 0),
+        );
+        toast.success("Expense updated");
+      } else {
+        await actor.createExpense(
+          form.title.trim(),
+          form.category,
+          BigInt(Math.round(Number(form.amount))),
+          form.description.trim(),
+          form.paidTo.trim(),
+          "Admin",
+          form.date,
+          form.paymentMethod,
+          form.receiptNumber.trim(),
+          BigInt(societyId ?? 0),
+        );
+        toast.success("Expense recorded");
+      }
+      setFormState(defaultForm);
+      onSaved();
+      onClose();
+    } catch (err) {
+      console.error("Error saving expense:", err);
+      toast.error("Failed to save expense. Please try again.");
+    } finally {
+      setIsSaving(false);
     }
-    setFormState(defaultForm);
-    onClose();
   };
 
   return (
@@ -231,6 +264,7 @@ function ExpenseDialog({
               onChange={(e) => set("title", e.target.value)}
               placeholder="e.g. Lift Maintenance, Electricity Bill"
               className="font-body"
+              data-ocid="expense.input"
             />
           </div>
 
@@ -241,7 +275,7 @@ function ExpenseDialog({
                 value={form.category}
                 onValueChange={(v) => set("category", v)}
               >
-                <SelectTrigger className="font-body">
+                <SelectTrigger className="font-body" data-ocid="expense.select">
                   <SelectValue placeholder="Select category" />
                 </SelectTrigger>
                 <SelectContent>
@@ -324,16 +358,22 @@ function ExpenseDialog({
               placeholder="Brief details about this expense..."
               className="font-body resize-none"
               rows={3}
+              data-ocid="expense.textarea"
             />
           </div>
 
           <Button
             className="w-full font-body"
             onClick={handleSave}
-            disabled={!isValid}
+            disabled={!isValid || isSaving}
             style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
+            data-ocid="expense.submit_button"
           >
-            {editingExpense ? "Save Changes" : "Record Expense"}
+            {isSaving
+              ? "Saving..."
+              : editingExpense
+                ? "Save Changes"
+                : "Record Expense"}
           </Button>
         </div>
       </DialogContent>
@@ -341,18 +381,21 @@ function ExpenseDialog({
   );
 }
 
+// ─── Main Component ───────────────────────────────────────────────────────────
+
 interface ExpensesProps {
   role: AppRole;
   societyId?: number | null;
 }
 
 export default function Expenses({ role, societyId }: ExpensesProps) {
-  const store = useSocietyStore();
-  const [, setVersion] = useState(0);
-  const refresh = () => setVersion((v) => v + 1);
-
+  const { actor, isFetching: actorFetching } = useActor();
+  const [allExpenses, setAllExpenses] = useState<LocalExpense[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [editingExpense, setEditingExpense] = useState<LocalExpense | null>(
+    null,
+  );
   const [filterCategory, setFilterCategory] = useState("All");
   const [filterMethod, setFilterMethod] = useState("All");
   const [search, setSearch] = useState("");
@@ -363,6 +406,40 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
     role === "Chairman" ||
     role === "Secretary" ||
     role === "Treasurer";
+
+  const loadExpenses = useCallback(async () => {
+    if (!actor) return;
+    setIsLoading(true);
+    try {
+      const raw = await actor.getExpenses();
+      const mapped: LocalExpense[] = raw.map((e) => ({
+        id: Number(e.id),
+        title: e.title,
+        category: e.category,
+        amount: Number(e.amount),
+        description: e.description,
+        paidTo: e.paidTo,
+        paidBy: e.paidBy,
+        date: e.date,
+        paymentMethod: e.paymentMethod,
+        receiptNumber: e.receiptNumber,
+        societyId: Number(e.societyId),
+      }));
+      setAllExpenses(mapped);
+    } catch (err) {
+      console.error("Failed to load expenses:", err);
+      toast.error("Failed to load expenses");
+      setAllExpenses([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [actor]);
+
+  useEffect(() => {
+    if (canEdit && actor && !actorFetching) {
+      loadExpenses();
+    }
+  }, [canEdit, actor, actorFetching, loadExpenses]);
 
   if (!canEdit) {
     return (
@@ -382,8 +459,6 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
       </div>
     );
   }
-
-  const allExpenses = store.getExpenses(societyId);
 
   // Filter
   const filtered = allExpenses.filter((e) => {
@@ -418,10 +493,28 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
       .reduce((sum, e) => sum + e.amount, 0),
   })).filter((d) => d.amount > 0);
 
-  const handleDelete = (id: number) => {
-    store.deleteExpense(id);
-    toast.success("Expense deleted");
-    refresh();
+  const handleDelete = async (id: number) => {
+    if (!actor) return;
+    try {
+      await actor.deleteExpense(BigInt(id));
+      toast.success("Expense deleted");
+      setAllExpenses((prev) => prev.filter((e) => e.id !== id));
+    } catch (err) {
+      console.error("Failed to delete expense:", err);
+      toast.error("Failed to delete expense");
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!actor) return;
+    try {
+      await actor.deleteAllExpenses();
+      toast.success("All expenses deleted");
+      setAllExpenses([]);
+    } catch (err) {
+      console.error("Failed to delete all expenses:", err);
+      toast.error("Failed to delete all expenses");
+    }
   };
 
   const openAdd = () => {
@@ -429,7 +522,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
     setDialogOpen(true);
   };
 
-  const openEdit = (expense: Expense) => {
+  const openEdit = (expense: LocalExpense) => {
     setEditingExpense(expense);
     setDialogOpen(true);
   };
@@ -449,11 +542,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
             <DeleteAllDialog
               label="Delete All Expenses"
               description="Are you sure you want to delete all expense records? This action cannot be undone."
-              onConfirm={() => {
-                store.deleteAllExpenses(societyId);
-                toast.success("All expenses deleted");
-                refresh();
-              }}
+              onConfirm={handleDeleteAll}
               ocidScope="expenses"
             />
           )}
@@ -461,6 +550,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
             className="gap-2 font-body"
             style={{ background: "oklch(0.52 0.18 243)", color: "#fff" }}
             onClick={openAdd}
+            data-ocid="expenses.primary_button"
           >
             <Plus className="w-4 h-4" />
             Add Expense
@@ -473,21 +563,25 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
         {[
           {
             label: "Total Expenses",
-            value: `₹${totalExpenses.toLocaleString("en-IN")}`,
-            sub: `${allExpenses.length} records`,
+            value: isLoading
+              ? "—"
+              : `₹${totalExpenses.toLocaleString("en-IN")}`,
+            sub: isLoading ? "Loading..." : `${allExpenses.length} records`,
             color: "oklch(0.55 0.2 25)",
             icon: TrendingDown,
           },
           {
             label: "This Month",
-            value: `₹${thisMonthExpenses.toLocaleString("en-IN")}`,
+            value: isLoading
+              ? "—"
+              : `₹${thisMonthExpenses.toLocaleString("en-IN")}`,
             sub: "current month spend",
             color: "oklch(0.52 0.18 243)",
             icon: Wallet,
           },
           {
             label: "Categories",
-            value: categoryBreakdown.length,
+            value: isLoading ? "—" : categoryBreakdown.length,
             sub: "active expense types",
             color: "oklch(0.58 0.16 155)",
             icon: Receipt,
@@ -516,12 +610,16 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
                   <p className="text-xs font-body text-muted-foreground uppercase tracking-wide mb-0.5">
                     {stat.label}
                   </p>
-                  <p
-                    className="font-display text-2xl font-bold"
-                    style={{ color: stat.color }}
-                  >
-                    {stat.value}
-                  </p>
+                  {isLoading ? (
+                    <Skeleton className="h-8 w-24 mt-1" />
+                  ) : (
+                    <p
+                      className="font-display text-2xl font-bold"
+                      style={{ color: stat.color }}
+                    >
+                      {stat.value}
+                    </p>
+                  )}
                   <p className="text-xs font-body text-muted-foreground mt-0.5">
                     {stat.sub}
                   </p>
@@ -533,7 +631,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
       </div>
 
       {/* Category Spend Chart */}
-      {categoryBreakdown.length > 0 && (
+      {!isLoading && categoryBreakdown.length > 0 && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="font-display text-base flex items-center gap-2">
@@ -578,6 +676,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
                     borderRadius: 8,
                   }}
                 />
+                <Legend />
                 <Bar
                   dataKey="amount"
                   name="Amount"
@@ -608,9 +707,13 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="font-body max-w-xs"
+              data-ocid="expenses.search_input"
             />
             <Select value={filterCategory} onValueChange={setFilterCategory}>
-              <SelectTrigger className="font-body w-44">
+              <SelectTrigger
+                className="font-body w-44"
+                data-ocid="expenses.select"
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -666,14 +769,16 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
               style={{ color: "oklch(0.52 0.18 243)" }}
             />
             Expense Records
-            <span className="text-sm font-body text-muted-foreground font-normal ml-1">
-              ({filtered.length})
-            </span>
+            {!isLoading && (
+              <span className="text-sm font-body text-muted-foreground font-normal ml-1">
+                ({filtered.length})
+              </span>
+            )}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
-            <Table>
+            <Table data-ocid="expenses.table">
               <TableHeader>
                 <TableRow>
                   <TableHead className="font-body font-semibold">
@@ -703,11 +808,24 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.length === 0 ? (
+                {isLoading ? (
+                  Array.from({ length: 4 }).map((_, i) => (
+                    // biome-ignore lint/suspicious/noArrayIndexKey: skeleton rows
+                    <TableRow key={i} data-ocid={`expenses.row.${i + 1}`}>
+                      {Array.from({ length: 8 }).map((__, j) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: skeleton cells
+                        <TableCell key={j}>
+                          <Skeleton className="h-4 w-full" />
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))
+                ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
                       colSpan={8}
                       className="text-center py-14 font-body text-muted-foreground"
+                      data-ocid="expenses.empty_state"
                     >
                       {allExpenses.length === 0
                         ? 'No expenses recorded yet. Click "Add Expense" to get started.'
@@ -720,8 +838,11 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
                       (a, b) =>
                         new Date(b.date).getTime() - new Date(a.date).getTime(),
                     )
-                    .map((expense) => (
-                      <TableRow key={expense.id}>
+                    .map((expense, idx) => (
+                      <TableRow
+                        key={expense.id}
+                        data-ocid={`expenses.item.${idx + 1}`}
+                      >
                         <TableCell className="font-body text-sm whitespace-nowrap">
                           {new Date(expense.date).toLocaleDateString("en-IN", {
                             day: "2-digit",
@@ -768,6 +889,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
                               className="h-7 w-7"
                               title="Edit"
                               onClick={() => openEdit(expense)}
+                              data-ocid={`expenses.edit_button.${idx + 1}`}
                             >
                               <Edit2 className="w-3.5 h-3.5" />
                             </Button>
@@ -778,6 +900,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
                               title="Delete"
                               style={{ color: "oklch(0.55 0.2 25)" }}
                               onClick={() => handleDelete(expense.id)}
+                              data-ocid={`expenses.delete_button.${idx + 1}`}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -791,7 +914,7 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
           </div>
 
           {/* Footer total */}
-          {filtered.length > 0 && (
+          {!isLoading && filtered.length > 0 && (
             <>
               <Separator />
               <div className="flex items-center justify-end gap-3 px-4 py-3">
@@ -819,8 +942,8 @@ export default function Expenses({ role, societyId }: ExpensesProps) {
         onClose={() => {
           setDialogOpen(false);
           setEditingExpense(null);
-          refresh();
         }}
+        onSaved={loadExpenses}
         societyId={societyId}
       />
     </div>

@@ -1,3 +1,4 @@
+import type { Tower as BackendTower, Unit as BackendUnit } from "@/backend";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Table,
   TableBody,
@@ -29,215 +31,128 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Building2, Edit2, Home, Plus, Trash2 } from "lucide-react";
 import { motion } from "motion/react";
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { AppRole } from "../store/societyStore";
+import { useActor } from "../hooks/useActor";
 import type {
+  AppRole,
   MaintenanceBreakdown,
   Society,
-  Tower,
-  Unit,
 } from "../store/societyStore";
 import { useSocietyStore } from "../store/societyStore";
 
-// ─── Add Tower Dialog ─────────────────────────────────────────────────────────
+// ─── Extended types (merged backend + localStorage extended data) ──────────────
 
-function AddTowerDialog({
-  societies,
-  defaultSocietyId,
-  canSelectSociety,
-  onSuccess,
-}: {
-  societies: Society[];
-  defaultSocietyId: number;
-  canSelectSociety: boolean;
-  onSuccess: () => void;
-}) {
-  const store = useSocietyStore();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState("");
-  const [totalFloors, setTotalFloors] = useState("");
-  const [societyId, setSocietyId] = useState(defaultSocietyId.toString());
-
-  const handleCreate = () => {
-    if (!name || !totalFloors || !societyId) return;
-    store.createTower(name, Number(totalFloors), Number(societyId));
-    toast.success("Tower added successfully");
-    setOpen(false);
-    setName("");
-    setTotalFloors("");
-    setSocietyId(defaultSocietyId.toString());
-    onSuccess();
-  };
-
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button size="sm" className="gap-2 font-body">
-          <Plus className="w-4 h-4" /> Add Tower
-        </Button>
-      </DialogTrigger>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle className="font-display">Add New Tower</DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 pt-2">
-          {canSelectSociety && societies.length > 0 && (
-            <div className="space-y-1.5">
-              <Label className="font-body">Society</Label>
-              <Select value={societyId} onValueChange={setSocietyId}>
-                <SelectTrigger className="font-body">
-                  <SelectValue placeholder="Select society" />
-                </SelectTrigger>
-                <SelectContent>
-                  {societies.map((s) => (
-                    <SelectItem
-                      key={s.id.toString()}
-                      value={s.id.toString()}
-                      className="font-body"
-                    >
-                      {s.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="space-y-1.5">
-            <Label className="font-body">Tower Name</Label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Tower A"
-              className="font-body"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="font-body">Total Floors</Label>
-            <Input
-              type="number"
-              value={totalFloors}
-              onChange={(e) => setTotalFloors(e.target.value)}
-              placeholder="e.g. 12"
-              className="font-body"
-            />
-          </div>
-          <Button
-            className="w-full font-body"
-            onClick={handleCreate}
-            disabled={!name || !totalFloors || !societyId}
-          >
-            Create Tower
-          </Button>
-        </div>
-      </DialogContent>
-    </Dialog>
-  );
+interface TowerExt {
+  id: number; // converted from bigint
+  name: string;
+  totalFloors: number; // converted from bigint
+  societyId: number; // from localStorage extended data
 }
 
-// ─── Edit Tower Dialog ────────────────────────────────────────────────────────
+interface UnitExt {
+  id: number;
+  towerId: number;
+  unitNumber: string;
+  floor: number;
+  ownerName: string;
+  isOccupied: boolean;
+  monthlyMaintenance: number; // grand total
+  maintenanceBreakdown?: MaintenanceBreakdown;
+  previousDue?: number;
+  societyId: number;
+  // Extended
+  area?: number;
+  ownershipType?: string;
+  phone?: string;
+  email?: string;
+  memberCount?: number;
+  unitType?: string;
+}
 
-function EditTowerDialog({
-  tower,
-  societies,
-  canSelectSociety,
-  onSuccess,
-}: {
-  tower: Tower;
-  societies: Society[];
-  canSelectSociety: boolean;
-  onSuccess: () => void;
-}) {
-  const store = useSocietyStore();
-  const [open, setOpen] = useState(false);
-  const [name, setName] = useState(tower.name);
-  const [totalFloors, setTotalFloors] = useState(tower.totalFloors.toString());
-  const [societyId, setSocietyId] = useState(tower.societyId.toString());
+// ─── localStorage helpers ─────────────────────────────────────────────────────
 
-  const handleOpen = () => {
-    setName(tower.name);
-    setTotalFloors(tower.totalFloors.toString());
-    setSocietyId(tower.societyId.toString());
-    setOpen(true);
-  };
+const TOWER_EXT_KEY = "ssm_tower_ext";
 
-  const handleSave = () => {
-    if (!name || !totalFloors || !societyId) return;
-    store.updateTower(tower.id, name, Number(totalFloors), Number(societyId));
-    toast.success("Tower updated successfully");
-    setOpen(false);
-    onSuccess();
-  };
+interface TowerExtData {
+  societyId: number;
+}
 
-  return (
-    <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="opacity-0 group-hover:opacity-100 h-7 w-7"
-        style={{ color: "oklch(0.52 0.18 243)" }}
-        onClick={handleOpen}
-      >
-        <Edit2 className="w-3.5 h-3.5" />
-      </Button>
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle className="font-display">Edit Tower</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 pt-2">
-            {canSelectSociety && societies.length > 0 && (
-              <div className="space-y-1.5">
-                <Label className="font-body">Society</Label>
-                <Select value={societyId} onValueChange={setSocietyId}>
-                  <SelectTrigger className="font-body">
-                    <SelectValue placeholder="Select society" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {societies.map((s) => (
-                      <SelectItem
-                        key={s.id.toString()}
-                        value={s.id.toString()}
-                        className="font-body"
-                      >
-                        {s.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label className="font-body">Tower Name</Label>
-              <Input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Tower A"
-                className="font-body"
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label className="font-body">Total Floors</Label>
-              <Input
-                type="number"
-                value={totalFloors}
-                onChange={(e) => setTotalFloors(e.target.value)}
-                placeholder="e.g. 12"
-                className="font-body"
-              />
-            </div>
-            <Button
-              className="w-full font-body"
-              onClick={handleSave}
-              disabled={!name || !totalFloors || !societyId}
-            >
-              Save Changes
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
+function getTowerExtData(): Record<string, TowerExtData> {
+  try {
+    const raw = localStorage.getItem(TOWER_EXT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function setTowerExtData(data: Record<string, TowerExtData>): void {
+  try {
+    localStorage.setItem(TOWER_EXT_KEY, JSON.stringify(data));
+  } catch {
+    // ignore
+  }
+}
+
+// ─── Merge helpers ────────────────────────────────────────────────────────────
+
+function mergeTowers(
+  backendTowers: BackendTower[],
+  extData: Record<string, TowerExtData>,
+  activeSocietyId: number,
+): TowerExt[] {
+  return backendTowers.map((t) => ({
+    id: Number(t.id),
+    name: t.name,
+    totalFloors: Number(t.totalFloors),
+    societyId: extData[t.id.toString()]?.societyId ?? activeSocietyId,
+  }));
+}
+
+function mergeUnits(
+  backendUnits: BackendUnit[],
+  towerExtData: Record<string, TowerExtData>,
+  activeSocietyId: number,
+): UnitExt[] {
+  return backendUnits.map((u) => {
+    // societyId is derived from the tower's localStorage ext data
+    const towerSocietyId =
+      towerExtData[u.towerId.toString()]?.societyId ?? activeSocietyId;
+    // Convert backend UnitBreakdown (bigint) to local MaintenanceBreakdown (number)
+    const bd = u.maintenanceBreakdown;
+    const maintenanceBreakdown: MaintenanceBreakdown | undefined = bd
+      ? {
+          serviceCharges: Number(bd.serviceCharges),
+          nonOccupancyCharges: Number(bd.nonOccupancyCharges),
+          liftMaintenance: Number(bd.liftMaintenance),
+          parkingCharges: Number(bd.parkingCharges),
+          sinkingFund: Number(bd.sinkingFund),
+          otherCharges: Number(bd.otherCharges),
+          houseTax: Number(bd.houseTax),
+          repairMaintenance: Number(bd.repairMaintenance),
+          interest: Number(bd.interest),
+        }
+      : undefined;
+    return {
+      id: Number(u.id),
+      towerId: Number(u.towerId),
+      unitNumber: u.unitNumber,
+      floor: Number(u.floor),
+      ownerName: u.ownerName,
+      isOccupied: u.isOccupied,
+      monthlyMaintenance: Number(u.monthlyMaintenance),
+      maintenanceBreakdown,
+      previousDue: Number(u.previousDue),
+      societyId: towerSocietyId,
+      area: u.area != null ? Number(u.area) : undefined,
+      ownershipType: u.ownershipType,
+      phone: u.phone,
+      email: u.email,
+      memberCount: u.memberCount != null ? Number(u.memberCount) : undefined,
+      unitType: u.unitType,
+    };
+  });
 }
 
 // ─── Maintenance Breakdown Fields ────────────────────────────────────────────
@@ -442,22 +357,265 @@ function MaintenanceBreakdownFields({
   );
 }
 
+// ─── Add Tower Dialog ─────────────────────────────────────────────────────────
+
+function AddTowerDialog({
+  societies,
+  defaultSocietyId,
+  canSelectSociety,
+  onSuccess,
+}: {
+  societies: Society[];
+  defaultSocietyId: number;
+  canSelectSociety: boolean;
+  onSuccess: () => void;
+}) {
+  const { actor } = useActor();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState("");
+  const [totalFloors, setTotalFloors] = useState("");
+  const [societyId, setSocietyId] = useState(defaultSocietyId.toString());
+  const [saving, setSaving] = useState(false);
+
+  const handleCreate = async () => {
+    if (!actor || !name || !totalFloors || !societyId) return;
+    setSaving(true);
+    try {
+      const newId = await actor.createTower(name, BigInt(Number(totalFloors)));
+      const ext = getTowerExtData();
+      ext[newId.toString()] = { societyId: Number(societyId) };
+      setTowerExtData(ext);
+      toast.success("Tower added successfully");
+      setOpen(false);
+      setName("");
+      setTotalFloors("");
+      setSocietyId(defaultSocietyId.toString());
+      onSuccess();
+    } catch {
+      toast.error("Failed to add tower");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button
+          size="sm"
+          className="gap-2 font-body"
+          data-ocid="properties.tower.open_modal_button"
+        >
+          <Plus className="w-4 h-4" /> Add Tower
+        </Button>
+      </DialogTrigger>
+      <DialogContent data-ocid="properties.tower.dialog">
+        <DialogHeader>
+          <DialogTitle className="font-display">Add New Tower</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-4 pt-2">
+          {canSelectSociety && societies.length > 0 && (
+            <div className="space-y-1.5">
+              <Label className="font-body">Society</Label>
+              <Select value={societyId} onValueChange={setSocietyId}>
+                <SelectTrigger
+                  className="font-body"
+                  data-ocid="properties.tower.select"
+                >
+                  <SelectValue placeholder="Select society" />
+                </SelectTrigger>
+                <SelectContent>
+                  {societies.map((s) => (
+                    <SelectItem
+                      key={s.id.toString()}
+                      value={s.id.toString()}
+                      className="font-body"
+                    >
+                      {s.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div className="space-y-1.5">
+            <Label className="font-body">Tower Name</Label>
+            <Input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Tower A"
+              className="font-body"
+              data-ocid="properties.tower.input"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="font-body">Total Floors</Label>
+            <Input
+              type="number"
+              value={totalFloors}
+              onChange={(e) => setTotalFloors(e.target.value)}
+              placeholder="e.g. 12"
+              className="font-body"
+            />
+          </div>
+          <Button
+            className="w-full font-body"
+            onClick={handleCreate}
+            disabled={!name || !totalFloors || !societyId || saving || !actor}
+            data-ocid="properties.tower.submit_button"
+          >
+            {saving ? "Creating..." : "Create Tower"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Edit Tower Dialog ────────────────────────────────────────────────────────
+
+function EditTowerDialog({
+  tower,
+  societies,
+  canSelectSociety,
+  onSuccess,
+}: {
+  tower: TowerExt;
+  societies: Society[];
+  canSelectSociety: boolean;
+  onSuccess: () => void;
+}) {
+  const { actor } = useActor();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState(tower.name);
+  const [totalFloors, setTotalFloors] = useState(tower.totalFloors.toString());
+  const [societyId, setSocietyId] = useState(tower.societyId.toString());
+  const [saving, setSaving] = useState(false);
+
+  const handleOpen = () => {
+    setName(tower.name);
+    setTotalFloors(tower.totalFloors.toString());
+    setSocietyId(tower.societyId.toString());
+    setOpen(true);
+  };
+
+  const handleSave = async () => {
+    if (!actor || !name || !totalFloors || !societyId) return;
+    setSaving(true);
+    try {
+      await actor.updateTower(
+        BigInt(tower.id),
+        name,
+        BigInt(Number(totalFloors)),
+      );
+      // update societyId in localStorage extended data
+      const ext = getTowerExtData();
+      ext[tower.id.toString()] = { societyId: Number(societyId) };
+      setTowerExtData(ext);
+      toast.success("Tower updated successfully");
+      setOpen(false);
+      onSuccess();
+    } catch {
+      toast.error("Failed to update tower");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon"
+        className="opacity-0 group-hover:opacity-100 h-7 w-7"
+        style={{ color: "oklch(0.52 0.18 243)" }}
+        onClick={handleOpen}
+        data-ocid="properties.tower.edit_button"
+      >
+        <Edit2 className="w-3.5 h-3.5" />
+      </Button>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent data-ocid="properties.tower.dialog">
+          <DialogHeader>
+            <DialogTitle className="font-display">Edit Tower</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {canSelectSociety && societies.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="font-body">Society</Label>
+                <Select value={societyId} onValueChange={setSocietyId}>
+                  <SelectTrigger
+                    className="font-body"
+                    data-ocid="properties.tower.select"
+                  >
+                    <SelectValue placeholder="Select society" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {societies.map((s) => (
+                      <SelectItem
+                        key={s.id.toString()}
+                        value={s.id.toString()}
+                        className="font-body"
+                      >
+                        {s.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="font-body">Tower Name</Label>
+              <Input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Tower A"
+                className="font-body"
+                data-ocid="properties.tower.input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="font-body">Total Floors</Label>
+              <Input
+                type="number"
+                value={totalFloors}
+                onChange={(e) => setTotalFloors(e.target.value)}
+                placeholder="e.g. 12"
+                className="font-body"
+              />
+            </div>
+            <Button
+              className="w-full font-body"
+              onClick={handleSave}
+              disabled={!name || !totalFloors || !societyId || saving || !actor}
+              data-ocid="properties.tower.save_button"
+            >
+              {saving ? "Saving..." : "Save Changes"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
 // ─── Add Unit Dialog ──────────────────────────────────────────────────────────
 
 function AddUnitDialog({
   towers,
   onSuccess,
 }: {
-  towers: Tower[];
+  towers: TowerExt[];
   onSuccess: () => void;
 }) {
-  const store = useSocietyStore();
+  const { actor } = useActor();
   const [open, setOpen] = useState(false);
   const [towerId, setTowerId] = useState("");
   const [unitNumber, setUnitNumber] = useState("");
   const [floor, setFloor] = useState("");
   const [ownerName, setOwnerName] = useState("");
   const [isOccupied, setIsOccupied] = useState("true");
+  const [saving, setSaving] = useState(false);
 
   // Extended unit fields
   const [area, setArea] = useState("");
@@ -516,8 +674,9 @@ function AddUnitDialog({
     setPreviousDue("0");
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (
+      !actor ||
       !towerId ||
       !unitNumber ||
       !floor ||
@@ -525,37 +684,47 @@ function AddUnitDialog({
       totalMaintenance === 0
     )
       return;
-    const breakdown: MaintenanceBreakdown = {
-      serviceCharges: Number(serviceCharges) || 0,
-      nonOccupancyCharges: Number(nonOccupancyCharges) || 0,
-      liftMaintenance: Number(liftMaintenance) || 0,
-      parkingCharges: Number(parkingCharges) || 0,
-      sinkingFund: Number(sinkingFund) || 0,
-      otherCharges: Number(otherCharges) || 0,
-      houseTax: Number(houseTax) || 0,
-      repairMaintenance: Number(repairMaintenance) || 0,
-      interest: Number(interest) || 0,
-    };
-    store.createUnit(
-      Number(towerId),
-      unitNumber,
-      Number(floor),
-      ownerName,
-      isOccupied === "true",
-      grandTotal,
-      breakdown,
-      Number(previousDue) || 0,
-      area ? Number(area) : undefined,
-      ownershipType || undefined,
-      phone || undefined,
-      email || undefined,
-      memberCount ? Number(memberCount) : undefined,
-      unitType || undefined,
-    );
-    toast.success("Unit added successfully");
-    setOpen(false);
-    resetForm();
-    onSuccess();
+    setSaving(true);
+    try {
+      const backendBreakdown = {
+        serviceCharges: BigInt(Number(serviceCharges) || 0),
+        nonOccupancyCharges: BigInt(Number(nonOccupancyCharges) || 0),
+        liftMaintenance: BigInt(Number(liftMaintenance) || 0),
+        parkingCharges: BigInt(Number(parkingCharges) || 0),
+        sinkingFund: BigInt(Number(sinkingFund) || 0),
+        otherCharges: BigInt(Number(otherCharges) || 0),
+        houseTax: BigInt(Number(houseTax) || 0),
+        repairMaintenance: BigInt(Number(repairMaintenance) || 0),
+        interest: BigInt(Number(interest) || 0),
+      };
+
+      await actor.createUnit(
+        BigInt(Number(towerId)),
+        unitNumber,
+        BigInt(Number(floor)),
+        ownerName,
+        null,
+        isOccupied === "true",
+        BigInt(grandTotal),
+        area ? BigInt(Number(area)) : null,
+        unitType || null,
+        ownershipType || null,
+        phone || null,
+        email || null,
+        memberCount ? BigInt(Number(memberCount)) : null,
+        backendBreakdown,
+        BigInt(Number(previousDue) || 0),
+      );
+
+      toast.success("Unit added successfully");
+      setOpen(false);
+      resetForm();
+      onSuccess();
+    } catch {
+      toast.error("Failed to add unit");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -567,11 +736,18 @@ function AddUnitDialog({
       }}
     >
       <DialogTrigger asChild>
-        <Button size="sm" className="gap-2 font-body">
+        <Button
+          size="sm"
+          className="gap-2 font-body"
+          data-ocid="properties.unit.open_modal_button"
+        >
           <Plus className="w-4 h-4" /> Add Unit
         </Button>
       </DialogTrigger>
-      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+      <DialogContent
+        className="max-w-md max-h-[90vh] overflow-y-auto"
+        data-ocid="properties.unit.dialog"
+      >
         <DialogHeader>
           <DialogTitle className="font-display">Add New Unit</DialogTitle>
         </DialogHeader>
@@ -580,7 +756,10 @@ function AddUnitDialog({
             <div className="space-y-1.5">
               <Label className="font-body">Tower</Label>
               <Select value={towerId} onValueChange={setTowerId}>
-                <SelectTrigger className="font-body">
+                <SelectTrigger
+                  className="font-body"
+                  data-ocid="properties.unit.select"
+                >
                   <SelectValue placeholder="Select tower" />
                 </SelectTrigger>
                 <SelectContent>
@@ -603,6 +782,7 @@ function AddUnitDialog({
                 onChange={(e) => setUnitNumber(e.target.value)}
                 placeholder="e.g. A-101"
                 className="font-body"
+                data-ocid="properties.unit.input"
               />
             </div>
           </div>
@@ -765,10 +945,13 @@ function AddUnitDialog({
               !unitNumber ||
               !floor ||
               !ownerName ||
-              totalMaintenance === 0
+              totalMaintenance === 0 ||
+              saving ||
+              !actor
             }
+            data-ocid="properties.unit.submit_button"
           >
-            Create Unit
+            {saving ? "Creating..." : "Create Unit"}
           </Button>
         </div>
       </DialogContent>
@@ -783,11 +966,11 @@ function EditUnitDialog({
   towers,
   onSuccess,
 }: {
-  unit: Unit;
-  towers: Tower[];
+  unit: UnitExt;
+  towers: TowerExt[];
   onSuccess: () => void;
 }) {
-  const store = useSocietyStore();
+  const { actor } = useActor();
   const [open, setOpen] = useState(false);
   const [towerId, setTowerId] = useState(unit.towerId.toString());
   const [unitNumber, setUnitNumber] = useState(unit.unitNumber);
@@ -796,6 +979,7 @@ function EditUnitDialog({
   const [isOccupied, setIsOccupied] = useState(
     unit.isOccupied ? "true" : "false",
   );
+  const [saving, setSaving] = useState(false);
 
   // Extended unit fields
   const [area, setArea] = useState((unit.area ?? "").toString());
@@ -881,8 +1065,9 @@ function EditUnitDialog({
     setOpen(true);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (
+      !actor ||
       !towerId ||
       !unitNumber ||
       !floor ||
@@ -890,37 +1075,47 @@ function EditUnitDialog({
       totalMaintenance === 0
     )
       return;
-    const breakdown: MaintenanceBreakdown = {
-      serviceCharges: Number(serviceCharges) || 0,
-      nonOccupancyCharges: Number(nonOccupancyCharges) || 0,
-      liftMaintenance: Number(liftMaintenance) || 0,
-      parkingCharges: Number(parkingCharges) || 0,
-      sinkingFund: Number(sinkingFund) || 0,
-      otherCharges: Number(otherCharges) || 0,
-      houseTax: Number(houseTax) || 0,
-      repairMaintenance: Number(repairMaintenance) || 0,
-      interest: Number(interest) || 0,
-    };
-    store.updateUnit(
-      unit.id,
-      Number(towerId),
-      unitNumber,
-      Number(floor),
-      ownerName,
-      isOccupied === "true",
-      grandTotal,
-      breakdown,
-      Number(previousDue) || 0,
-      area ? Number(area) : undefined,
-      ownershipType || undefined,
-      phone || undefined,
-      email || undefined,
-      memberCount ? Number(memberCount) : undefined,
-      unitType || undefined,
-    );
-    toast.success("Unit updated successfully");
-    setOpen(false);
-    onSuccess();
+    setSaving(true);
+    try {
+      const backendBreakdown = {
+        serviceCharges: BigInt(Number(serviceCharges) || 0),
+        nonOccupancyCharges: BigInt(Number(nonOccupancyCharges) || 0),
+        liftMaintenance: BigInt(Number(liftMaintenance) || 0),
+        parkingCharges: BigInt(Number(parkingCharges) || 0),
+        sinkingFund: BigInt(Number(sinkingFund) || 0),
+        otherCharges: BigInt(Number(otherCharges) || 0),
+        houseTax: BigInt(Number(houseTax) || 0),
+        repairMaintenance: BigInt(Number(repairMaintenance) || 0),
+        interest: BigInt(Number(interest) || 0),
+      };
+
+      await actor.updateUnit(
+        BigInt(unit.id),
+        BigInt(Number(towerId)),
+        unitNumber,
+        BigInt(Number(floor)),
+        ownerName,
+        null,
+        isOccupied === "true",
+        BigInt(grandTotal),
+        area ? BigInt(Number(area)) : null,
+        unitType || null,
+        ownershipType || null,
+        phone || null,
+        email || null,
+        memberCount ? BigInt(Number(memberCount)) : null,
+        backendBreakdown,
+        BigInt(Number(previousDue) || 0),
+      );
+
+      toast.success("Unit updated successfully");
+      setOpen(false);
+      onSuccess();
+    } catch {
+      toast.error("Failed to update unit");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -931,11 +1126,15 @@ function EditUnitDialog({
         className="h-7 w-7"
         style={{ color: "oklch(0.52 0.18 243)" }}
         onClick={handleOpen}
+        data-ocid="properties.unit.edit_button"
       >
         <Edit2 className="w-3.5 h-3.5" />
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogContent
+          className="max-w-md max-h-[90vh] overflow-y-auto"
+          data-ocid="properties.unit.dialog"
+        >
           <DialogHeader>
             <DialogTitle className="font-display">Edit Unit</DialogTitle>
           </DialogHeader>
@@ -944,7 +1143,10 @@ function EditUnitDialog({
               <div className="space-y-1.5">
                 <Label className="font-body">Tower</Label>
                 <Select value={towerId} onValueChange={setTowerId}>
-                  <SelectTrigger className="font-body">
+                  <SelectTrigger
+                    className="font-body"
+                    data-ocid="properties.unit.select"
+                  >
                     <SelectValue placeholder="Select tower" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1032,6 +1234,7 @@ function EditUnitDialog({
                   </SelectTrigger>
                   <SelectContent>
                     {[
+                      "1RK",
                       "Studio",
                       "1BHK",
                       "2BHK",
@@ -1128,10 +1331,13 @@ function EditUnitDialog({
                 !unitNumber ||
                 !floor ||
                 !ownerName ||
-                totalMaintenance === 0
+                totalMaintenance === 0 ||
+                saving ||
+                !actor
               }
+              data-ocid="properties.unit.save_button"
             >
-              Save Changes
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </DialogContent>
@@ -1140,21 +1346,58 @@ function EditUnitDialog({
   );
 }
 
+// ─── Loading Skeleton ─────────────────────────────────────────────────────────
+
+function PropertiesSkeleton() {
+  return (
+    <div className="space-y-6 max-w-7xl">
+      <div className="flex items-center gap-4 mb-4">
+        <Skeleton className="h-9 w-48" />
+      </div>
+      <div className="flex justify-end mb-4">
+        <Skeleton className="h-9 w-28" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center gap-3">
+                <Skeleton className="w-10 h-10 rounded-lg" />
+                <div className="space-y-1.5">
+                  <Skeleton className="h-4 w-24" />
+                  <Skeleton className="h-3 w-16" />
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="grid grid-cols-3 gap-3">
+                {[1, 2, 3].map((j) => (
+                  <Skeleton key={j} className="h-14 rounded-lg" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Properties Component ────────────────────────────────────────────────
 
 export default function Properties({
   role,
-  societyId,
+  societyId: filterSocietyId,
 }: { role?: AppRole; societyId?: number | null }) {
+  const { actor, isFetching } = useActor();
   const store = useSocietyStore();
-  // version counter to force re-render after mutations
-  const [, setVersion] = useState(0);
-  const refresh = () => setVersion((v) => v + 1);
 
-  const towers = store.getTowers(societyId);
-  const units = store.getUnits(societyId);
+  const [towers, setTowers] = useState<TowerExt[]>([]);
+  const [units, setUnits] = useState<UnitExt[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const societies = store.getSocieties();
-  const activeSocietyId = societyId ?? store.getActiveSocietyId();
+  const activeSocietyId = filterSocietyId ?? store.getActiveSocietyId();
 
   // Only committee roles can select society
   const isCommitteeRole =
@@ -1165,19 +1408,74 @@ export default function Properties({
     role === "Treasurer";
   const canSelectSociety = isCommitteeRole ? societies.length > 1 : false;
 
-  const getSocietyName = (societyId: number) =>
-    societies.find((s) => s.id === societyId)?.name ?? "—";
+  const getSocietyName = (sid: number) =>
+    societies.find((s) => s.id === sid)?.name ?? "—";
 
-  const deleteTower = (id: number) => {
-    store.deleteTower(id);
-    toast.success("Tower deleted");
-    refresh();
+  const loadData = useCallback(async () => {
+    if (!actor) return;
+    setLoading(true);
+    try {
+      const [backendTowers, backendUnits] = await Promise.all([
+        actor.getTowers(),
+        actor.getUnits(),
+      ]);
+
+      const towerExt = getTowerExtData();
+
+      const mergedTowers = mergeTowers(
+        backendTowers,
+        towerExt,
+        activeSocietyId,
+      );
+      const mergedUnits = mergeUnits(backendUnits, towerExt, activeSocietyId);
+
+      // Filter by societyId when provided
+      const filteredTowers =
+        filterSocietyId != null
+          ? mergedTowers.filter((t) => t.societyId === filterSocietyId)
+          : mergedTowers;
+      const filteredUnits =
+        filterSocietyId != null
+          ? mergedUnits.filter((u) => u.societyId === filterSocietyId)
+          : mergedUnits;
+
+      setTowers(filteredTowers);
+      setUnits(filteredUnits);
+    } catch {
+      toast.error("Failed to load properties");
+    } finally {
+      setLoading(false);
+    }
+  }, [actor, activeSocietyId, filterSocietyId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const deleteTower = async (id: number) => {
+    if (!actor) return;
+    try {
+      await actor.deleteTower(BigInt(id));
+      // Remove from localStorage extended data
+      const ext = getTowerExtData();
+      delete ext[id.toString()];
+      setTowerExtData(ext);
+      toast.success("Tower deleted");
+      loadData();
+    } catch {
+      toast.error("Failed to delete tower");
+    }
   };
 
-  const deleteUnit = (id: number) => {
-    store.deleteUnit(id);
-    toast.success("Unit deleted");
-    refresh();
+  const deleteUnit = async (id: number) => {
+    if (!actor) return;
+    try {
+      await actor.deleteUnit(BigInt(id));
+      toast.success("Unit deleted");
+      loadData();
+    } catch {
+      toast.error("Failed to delete unit");
+    }
   };
 
   const getUnitsForTower = (towerId: number) =>
@@ -1186,15 +1484,28 @@ export default function Properties({
   const getTowerName = (towerId: number) =>
     towers.find((t) => t.id === towerId)?.name ?? "—";
 
+  // Show skeleton while actor is loading or data is being fetched
+  if (isFetching || (loading && towers.length === 0 && units.length === 0)) {
+    return <PropertiesSkeleton />;
+  }
+
   return (
     <div className="space-y-6 max-w-7xl">
       <Tabs defaultValue="towers">
         <div className="flex items-center justify-between mb-4">
           <TabsList className="font-body">
-            <TabsTrigger value="towers" className="gap-2">
+            <TabsTrigger
+              value="towers"
+              className="gap-2"
+              data-ocid="properties.towers.tab"
+            >
               <Building2 className="w-3.5 h-3.5" /> Towers ({towers.length})
             </TabsTrigger>
-            <TabsTrigger value="units" className="gap-2">
+            <TabsTrigger
+              value="units"
+              className="gap-2"
+              data-ocid="properties.units.tab"
+            >
               <Home className="w-3.5 h-3.5" /> Units ({units.length})
             </TabsTrigger>
           </TabsList>
@@ -1206,11 +1517,21 @@ export default function Properties({
               societies={societies}
               defaultSocietyId={activeSocietyId}
               canSelectSociety={canSelectSociety}
-              onSuccess={refresh}
+              onSuccess={loadData}
             />
           </div>
-          {towers.length === 0 ? (
-            <Card>
+          {loading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[1, 2].map((i) => (
+                <Card key={i}>
+                  <CardContent className="py-6">
+                    <Skeleton className="h-16 w-full" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : towers.length === 0 ? (
+            <Card data-ocid="properties.towers.empty_state">
               <CardContent className="py-16 text-center">
                 <Building2
                   className="w-10 h-10 mx-auto mb-3"
@@ -1235,6 +1556,7 @@ export default function Properties({
                     initial={{ opacity: 0, y: 12 }}
                     animate={{ opacity: 1, y: 0 }}
                     transition={{ delay: i * 0.05 }}
+                    data-ocid={`properties.towers.item.${i + 1}`}
                   >
                     <Card className="group hover:shadow-md transition-shadow">
                       <CardHeader className="pb-3">
@@ -1270,13 +1592,14 @@ export default function Properties({
                               tower={tower}
                               societies={societies}
                               canSelectSociety={canSelectSociety}
-                              onSuccess={refresh}
+                              onSuccess={loadData}
                             />
                             <Button
                               variant="ghost"
                               size="icon"
                               className="opacity-0 group-hover:opacity-100 h-7 w-7 text-destructive"
                               onClick={() => deleteTower(tower.id)}
+                              data-ocid="properties.tower.delete_button"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </Button>
@@ -1330,11 +1653,11 @@ export default function Properties({
 
         <TabsContent value="units" className="mt-0">
           <div className="flex justify-end mb-4">
-            <AddUnitDialog towers={towers} onSuccess={refresh} />
+            <AddUnitDialog towers={towers} onSuccess={loadData} />
           </div>
           <Card>
             <div className="overflow-x-auto">
-              <Table>
+              <Table data-ocid="properties.units.table">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="font-body font-semibold">
@@ -1366,20 +1689,37 @@ export default function Properties({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {units.length === 0 ? (
+                  {loading ? (
+                    <TableRow>
+                      <TableCell
+                        colSpan={societies.length > 1 ? 8 : 7}
+                        className="py-8"
+                      >
+                        <div className="space-y-2">
+                          {[1, 2, 3].map((i) => (
+                            <Skeleton key={i} className="h-8 w-full" />
+                          ))}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ) : units.length === 0 ? (
                     <TableRow>
                       <TableCell
                         colSpan={societies.length > 1 ? 8 : 7}
                         className="text-center py-12 font-body text-muted-foreground"
+                        data-ocid="properties.units.empty_state"
                       >
                         No units found. Add a tower and then add units.
                       </TableCell>
                     </TableRow>
                   ) : (
-                    units.map((unit) => {
+                    units.map((unit, idx) => {
                       const tower = towers.find((t) => t.id === unit.towerId);
                       return (
-                        <TableRow key={unit.id.toString()}>
+                        <TableRow
+                          key={unit.id.toString()}
+                          data-ocid={`properties.units.row.${idx + 1}`}
+                        >
                           <TableCell className="font-display font-semibold">
                             {unit.unitNumber}
                           </TableCell>
@@ -1428,13 +1768,14 @@ export default function Properties({
                               <EditUnitDialog
                                 unit={unit}
                                 towers={towers}
-                                onSuccess={refresh}
+                                onSuccess={loadData}
                               />
                               <Button
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7 text-destructive"
                                 onClick={() => deleteUnit(unit.id)}
+                                data-ocid="properties.unit.delete_button"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>

@@ -7,6 +7,10 @@ export interface None {
     __kind__: "None";
 }
 export type Option<T> = Some<T> | None;
+export interface UserProfile {
+    name: string;
+    unitId?: bigint;
+}
 export interface SalaryRecord {
     id: bigint;
     status: string;
@@ -40,6 +44,19 @@ export interface BillBreakdown {
     sinkingFund: bigint;
     parkingCharges: bigint;
 }
+export interface Expense {
+    id: bigint;
+    title: string;
+    societyId: bigint;
+    paymentMethod: string;
+    date: string;
+    description: string;
+    category: string;
+    amount: bigint;
+    paidBy: string;
+    paidTo: string;
+    receiptNumber: string;
+}
 export interface Poll {
     id: bigint;
     question: string;
@@ -55,12 +72,20 @@ export interface Tower {
 }
 export interface Unit {
     id: bigint;
+    unitType?: string;
     towerId: bigint;
     floor: bigint;
     ownerName: string;
     ownerId?: Principal;
+    area?: bigint;
+    ownershipType?: string;
+    memberCount?: bigint;
+    maintenanceBreakdown?: UnitBreakdown;
+    email?: string;
     isOccupied: boolean;
     unitNumber: string;
+    previousDue: bigint;
+    phone?: string;
     monthlyMaintenance: bigint;
 }
 export interface Staff {
@@ -129,9 +154,16 @@ export interface FinancialSummary {
     totalBilled: bigint;
     pendingDues: bigint;
 }
-export interface UserProfile {
-    name: string;
-    unitId?: bigint;
+export interface UnitBreakdown {
+    nonOccupancyCharges: bigint;
+    interest: bigint;
+    repairMaintenance: bigint;
+    serviceCharges: bigint;
+    otherCharges: bigint;
+    houseTax: bigint;
+    liftMaintenance: bigint;
+    sinkingFund: bigint;
+    parkingCharges: bigint;
 }
 export enum UserRole {
     admin = "admin",
@@ -145,12 +177,15 @@ export interface backendInterface {
     checkOutVisitor(id: bigint, checkOutTime: string): Promise<void>;
     createBill(unitId: bigint, unitNumber: string, amount: bigint, dueDate: string, month: bigint, year: bigint, previousDue: bigint, grandTotal: bigint, societyId: bigint, breakdown: BillBreakdown): Promise<bigint>;
     createComplaint(title: string, description: string, category: string, unitNumber: string, residentName: string, priority: string, createdAt: string): Promise<bigint>;
+    createExpense(title: string, category: string, amount: bigint, description: string, paidTo: string, paidBy: string, date: string, paymentMethod: string, receiptNumber: string, societyId: bigint): Promise<bigint>;
     createNotice(title: string, content: string, category: string, postedBy: string, postedAt: string): Promise<bigint>;
     createPoll(question: string, options: Array<string>, createdBy: string, createdAt: string): Promise<bigint>;
     createTower(name: string, totalFloors: bigint): Promise<bigint>;
-    createUnit(towerId: bigint, unitNumber: string, floor: bigint, ownerName: string, ownerId: Principal | null, isOccupied: boolean, monthlyMaintenance: bigint): Promise<bigint>;
+    createUnit(towerId: bigint, unitNumber: string, floor: bigint, ownerName: string, ownerId: Principal | null, isOccupied: boolean, monthlyMaintenance: bigint, area: bigint | null, unitType: string | null, ownershipType: string | null, phone: string | null, email: string | null, memberCount: bigint | null, maintenanceBreakdown: UnitBreakdown | null, previousDue: bigint): Promise<bigint>;
     deleteAllBills(): Promise<void>;
+    deleteAllExpenses(): Promise<void>;
     deleteBill(id: bigint): Promise<void>;
+    deleteExpense(id: bigint): Promise<void>;
     deleteTower(id: bigint): Promise<void>;
     deleteUnit(id: bigint): Promise<void>;
     getActiveVisitors(): Promise<Array<Visitor>>;
@@ -159,6 +194,7 @@ export interface backendInterface {
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getComplaints(): Promise<Array<Complaint>>;
+    getExpenses(): Promise<Array<Expense>>;
     getFinancialSummary(): Promise<FinancialSummary>;
     getNotices(): Promise<Array<Notice>>;
     getPolls(): Promise<Array<Poll>>;
@@ -176,8 +212,9 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     updateBill(id: bigint, unitId: bigint, unitNumber: string, amount: bigint, dueDate: string, month: bigint, year: bigint, previousDue: bigint, grandTotal: bigint, societyId: bigint, breakdown: BillBreakdown, status: string): Promise<void>;
     updateComplaintStatus(id: bigint, status: string, resolution: string | null): Promise<void>;
+    updateExpense(id: bigint, title: string, category: string, amount: bigint, description: string, paidTo: string, paidBy: string, date: string, paymentMethod: string, receiptNumber: string, societyId: bigint): Promise<void>;
     updateSocietyInfo(name: string, address: string, city: string, registrationNumber: string, contactPhone: string): Promise<void>;
     updateTower(id: bigint, name: string, totalFloors: bigint): Promise<void>;
-    updateUnit(id: bigint, towerId: bigint, unitNumber: string, floor: bigint, ownerName: string, ownerId: Principal | null, isOccupied: boolean, monthlyMaintenance: bigint): Promise<void>;
+    updateUnit(id: bigint, towerId: bigint, unitNumber: string, floor: bigint, ownerName: string, ownerId: Principal | null, isOccupied: boolean, monthlyMaintenance: bigint, area: bigint | null, unitType: string | null, ownershipType: string | null, phone: string | null, email: string | null, memberCount: bigint | null, maintenanceBreakdown: UnitBreakdown | null, previousDue: bigint): Promise<void>;
     voteOnPoll(pollId: bigint, optionId: bigint): Promise<void>;
 }

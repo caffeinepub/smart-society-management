@@ -54,6 +54,19 @@ export interface Complaint {
   'priority' : string,
   'residentName' : string,
 }
+export interface Expense {
+  'id' : bigint,
+  'title' : string,
+  'societyId' : bigint,
+  'paymentMethod' : string,
+  'date' : string,
+  'description' : string,
+  'category' : string,
+  'amount' : bigint,
+  'paidBy' : string,
+  'paidTo' : string,
+  'receiptNumber' : string,
+}
 export interface FinancialSummary {
   'totalCollected' : bigint,
   'totalBilled' : bigint,
@@ -109,13 +122,32 @@ export interface Tower {
 }
 export interface Unit {
   'id' : bigint,
+  'unitType' : [] | [string],
   'towerId' : bigint,
   'floor' : bigint,
   'ownerName' : string,
   'ownerId' : [] | [Principal],
+  'area' : [] | [bigint],
+  'ownershipType' : [] | [string],
+  'memberCount' : [] | [bigint],
+  'maintenanceBreakdown' : [] | [UnitBreakdown],
+  'email' : [] | [string],
   'isOccupied' : boolean,
   'unitNumber' : string,
+  'previousDue' : bigint,
+  'phone' : [] | [string],
   'monthlyMaintenance' : bigint,
+}
+export interface UnitBreakdown {
+  'nonOccupancyCharges' : bigint,
+  'interest' : bigint,
+  'repairMaintenance' : bigint,
+  'serviceCharges' : bigint,
+  'otherCharges' : bigint,
+  'houseTax' : bigint,
+  'liftMaintenance' : bigint,
+  'sinkingFund' : bigint,
+  'parkingCharges' : bigint,
 }
 export interface UserProfile { 'name' : string, 'unitId' : [] | [bigint] }
 export type UserRole = { 'admin' : null } |
@@ -160,6 +192,21 @@ export interface _SERVICE {
     [string, string, string, string, string, string, string],
     bigint
   >,
+  'createExpense' : ActorMethod<
+    [
+      string,
+      string,
+      bigint,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      bigint,
+    ],
+    bigint
+  >,
   'createNotice' : ActorMethod<
     [string, string, string, string, string],
     bigint
@@ -167,11 +214,29 @@ export interface _SERVICE {
   'createPoll' : ActorMethod<[string, Array<string>, string, string], bigint>,
   'createTower' : ActorMethod<[string, bigint], bigint>,
   'createUnit' : ActorMethod<
-    [bigint, string, bigint, string, [] | [Principal], boolean, bigint],
+    [
+      bigint,
+      string,
+      bigint,
+      string,
+      [] | [Principal],
+      boolean,
+      bigint,
+      [] | [bigint],
+      [] | [string],
+      [] | [string],
+      [] | [string],
+      [] | [string],
+      [] | [bigint],
+      [] | [UnitBreakdown],
+      bigint,
+    ],
     bigint
   >,
   'deleteAllBills' : ActorMethod<[], undefined>,
+  'deleteAllExpenses' : ActorMethod<[], undefined>,
   'deleteBill' : ActorMethod<[bigint], undefined>,
+  'deleteExpense' : ActorMethod<[bigint], undefined>,
   'deleteTower' : ActorMethod<[bigint], undefined>,
   'deleteUnit' : ActorMethod<[bigint], undefined>,
   'getActiveVisitors' : ActorMethod<[], Array<Visitor>>,
@@ -180,6 +245,7 @@ export interface _SERVICE {
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
   'getComplaints' : ActorMethod<[], Array<Complaint>>,
+  'getExpenses' : ActorMethod<[], Array<Expense>>,
   'getFinancialSummary' : ActorMethod<[], FinancialSummary>,
   'getNotices' : ActorMethod<[], Array<Notice>>,
   'getPolls' : ActorMethod<[], Array<Poll>>,
@@ -219,13 +285,46 @@ export interface _SERVICE {
     [bigint, string, [] | [string]],
     undefined
   >,
+  'updateExpense' : ActorMethod<
+    [
+      bigint,
+      string,
+      string,
+      bigint,
+      string,
+      string,
+      string,
+      string,
+      string,
+      string,
+      bigint,
+    ],
+    undefined
+  >,
   'updateSocietyInfo' : ActorMethod<
     [string, string, string, string, string],
     undefined
   >,
   'updateTower' : ActorMethod<[bigint, string, bigint], undefined>,
   'updateUnit' : ActorMethod<
-    [bigint, bigint, string, bigint, string, [] | [Principal], boolean, bigint],
+    [
+      bigint,
+      bigint,
+      string,
+      bigint,
+      string,
+      [] | [Principal],
+      boolean,
+      bigint,
+      [] | [bigint],
+      [] | [string],
+      [] | [string],
+      [] | [string],
+      [] | [string],
+      [] | [bigint],
+      [] | [UnitBreakdown],
+      bigint,
+    ],
     undefined
   >,
   'voteOnPoll' : ActorMethod<[bigint, bigint], undefined>,
